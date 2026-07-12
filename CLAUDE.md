@@ -11,13 +11,14 @@ with charts, genetic variants, per-category insights, and a master protocol.
 
 **`labs.db` is the source of truth.** It's git-ignored and rebuilt by `init_db.py`. All
 edits happen against `labs.db` directly (or against `data/seed.json` if you want them in
-the seeded example). No external dependencies — Python stdlib only; Chart.js loads from a
-CDN in the generated HTML.
+the seeded example). Python standard library only, plus optional `bcftools` for fast VCF
+queries (pure-Python fallback); Chart.js loads from a CDN in the generated HTML.
 
 ## Commands
 
 ```bash
-python3 init_db.py                 # create labs.db from schema.sql + seed the example (--force to overwrite)
+python3 init_db.py                 # create labs.db with a synthetic demo (--force to overwrite)
+python3 init_db.py --empty         # clean start for the user's OWN data: schema + categories, no demo rows
 python3 viewer.py                  # regenerate viewer.html + master_protocol.md  (run after ANY db change)
 python3 import_dna.py <file>       # match a VCF or 23andMe raw file → variants table
 python3 export_for_llm.py          # full lab time-series → labs_export.md (feed to an LLM)
@@ -29,6 +30,11 @@ open viewer.html
 Self-checks (no writes): `python3 inspect_import.py --self-check`, `python3 import_dna.py
 --self-check`, `python3 seed_ref_ranges.py --self-check`, `python3 screening_calendar.py
 --self-check`.
+
+**Typical flow for the user's own data:** `python3 init_db.py --empty` → they drop their lab,
+DNA, and imaging files in `inputs/` → import the labs (below), `python3 import_dna.py` their
+genome, transcribe the imaging into `documents` → author `category_insights` + the master
+protocol → `python3 viewer.py`.
 
 ## Data model (`labs.db`)
 
