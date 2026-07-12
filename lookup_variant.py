@@ -21,24 +21,19 @@ need the network.
 
 Read-only: it prints results and never writes the database. To make a finding
 stick in the viewer, promote it into the `variants` table — see CLAUDE.md
-("DNA analysis phase"). The file is streamed line by line, so a multi-GB WGS VCF
-is fine (it stops once every requested rsID is found).
+("DNA analysis phase"). VCF sites are fetched with bcftools when it's installed
+(fast random access on a bgzipped, tabix-indexed VCF), otherwise the file is
+scanned in pure Python — either way a multi-GB WGS VCF works.
 """
-import gzip
 import json
 import sys
 from pathlib import Path
 
-import import_dna as I        # reuse parsing / build / match helpers — one source of truth
+import import_dna as I        # reuse parsing / build / match / VCF-query helpers — one source of truth
 import enrich_variants as E   # reuse the Ensembl position lookup (network; opt out with --offline)
 
 HERE = Path(__file__).parent
 CATALOGUE = HERE / "data" / "known_variants.json"
-
-
-def open_text(path):
-    path = Path(path)
-    return gzip.open(path, "rt") if path.suffix == ".gz" else open(path, "r")
 
 
 def find_genome():
@@ -78,17 +73,12 @@ def lookup(path, rsids, build_override=None, resolver=resolve_positions, offline
     Ensembl) — lets callers tell homozygous-reference (position known, no record)
     from a position we couldn't resolve. `resolver` is injectable for testing."""
     wanted = set(rsids)
-    header = []
-    with open_text(path) as f:                       # peek the header for format + build
-        for line in f:
-            header.append(line)
-            if (not line.startswith("#") and line.strip()) or len(header) > 1000:
-                break
-    fmt = I.detect_format("".join(header))
+    header = I.read_header(path)                      # streamed — no whole-file read
+    fmt = I.detect_format(header)
 
     if fmt != "vcf":                                 # 23andMe/AncestryDNA carry rsIDs directly
         found = {}
-        with open_text(path) as f:
+        with I.open_text(path) as f:
             for line in f:
                 if line.startswith("#") or not line.strip():
                     continue
@@ -100,7 +90,7 @@ def lookup(path, rsids, build_override=None, resolver=resolve_positions, offline
         return found, fmt, "37", set()
 
     # VCF: coordinates for the requested rsIDs — catalogue first, Ensembl for the rest.
-    build = build_override or I.detect_build("".join(header)) or I.DEFAULT_BUILD
+    build = build_override or I.detect_build(header) or I.DEFAULT_BUILD
     catalogue = json.loads(CATALOGUE.read_text())
     pos_of = {}                                      # rsid -> (chrom, pos)
     for rs in wanted:
@@ -113,17 +103,7 @@ def lookup(path, rsids, build_override=None, resolver=resolve_positions, offline
         pos_of.update(resolver(missing, build))
     resolved = set(pos_of)
     pos_index = {(I.norm_chrom(ch), p): rs for rs, (ch, p) in pos_of.items()}
-
-    found = {}
-    with open_text(path) as f:
-        for line in f:
-            if line.startswith("#") or not line.strip():
-                continue
-            call = I.vcf_call(line.rstrip("\n").split("\t"), pos_index or None)
-            if call and call[0] in wanted:
-                found[call[0]] = call[1]
-                if len(found) == len(wanted):
-                    break
+    found = I.query_vcf(path, pos_index, wanted)     # bcftools fast path if available, else scan
     return found, fmt, build, resolved
 
 

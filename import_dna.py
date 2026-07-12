@@ -10,8 +10,9 @@ the `variants` table (which the viewer renders per category).
 
 Orientation-safe: consumer chips and dbSNP don't always report on the same DNA
 strand, so every match is tried directly AND reverse-complemented before giving
-up. No external dependencies (pure stdlib) — no bcftools, snpEff or reference
-genome needed; a curated catalogue of well-characterized SNPs is enough.
+up. VCF sites are pulled with bcftools when it's installed (fast random access on
+a bgzipped, tabix-indexed VCF) and by a pure-Python scan otherwise — so it runs
+with or without bcftools; no snpEff or reference genome is needed.
 
 VCFs are matched by rsID (the ID column). When that's blank ('.', typical of a
 raw whole-genome VCF), matching falls back to chrom:pos. Positions are build-
@@ -25,8 +26,11 @@ Extend coverage by adding entries to data/known_variants.json (see its _README).
 """
 import gzip
 import json
+import os
 import re
+import shutil
 import sqlite3
+import subprocess
 import sys
 from pathlib import Path
 
@@ -35,15 +39,29 @@ DB = HERE / "labs.db"
 CATALOGUE = HERE / "data" / "known_variants.json"
 
 
-def read_genome_text(path):
-    """Read a genome file as text, transparently decompressing .gz.
-    ponytail: whole-file read is fine for consumer 23andMe/VCF files; a multi-GB
-    WGS VCF should be streamed instead — lookup_variant.py does that."""
+def open_text(path):
+    """Open a genome file for text reading, transparently decompressing .gz."""
     path = Path(path)
-    if path.suffix == ".gz":
-        with gzip.open(path, "rt") as f:
-            return f.read()
-    return path.read_text()
+    return gzip.open(path, "rt") if path.suffix == ".gz" else open(path, "r")
+
+
+def read_genome_text(path):
+    """Whole file as text (gzip-aware). Fine for 23andMe/array files; VCFs go
+    through read_header + query_vcf instead so a multi-GB WGS VCF isn't slurped."""
+    with open_text(path) as f:
+        return f.read()
+
+
+def read_header(path, max_lines=2000):
+    """First lines of a genome file (streaming) — enough for format/build
+    detection without loading a multi-GB VCF."""
+    head = []
+    with open_text(path) as f:
+        for line in f:
+            head.append(line)
+            if (not line.startswith("#") and line.strip()) or len(head) >= max_lines:
+                break
+    return "".join(head)
 
 COMP = {"A": "T", "T": "A", "G": "C", "C": "G"}
 
@@ -185,6 +203,59 @@ def parse_vcf(text, pos_index=None):
     return out
 
 
+# ── VCF querying (bcftools fast path, stdlib fallback) ───────────────────────
+def _bcftools_regions(path, positions):
+    """`bcftools query` restricted to `positions` (iterable of (chrom, pos)),
+    emitting VCF-shaped columns so vcf_call can parse them. Returns a list of
+    split-column records, or None when bcftools can't serve the query (missing
+    binary, un-indexed / not-bgzipped file, or any error) so the caller falls back.
+    Random access on an indexed bgzipped VCF — the reason bcftools is worth using."""
+    if not positions or shutil.which("bcftools") is None:
+        return None
+    p = str(path)
+    if p.endswith(".gz") and not (os.path.exists(p + ".tbi") or os.path.exists(p + ".csi")):
+        try:                                          # best-effort: index a bgzipped VCF once
+            subprocess.run(["bcftools", "index", "-f", "-t", p], check=True,
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=1200)
+        except Exception:
+            pass
+    regions = ",".join(f"{ch}:{pos}-{pos}" for ch, pos in positions)
+    fmt = "%CHROM\t%POS\t%ID\t%REF\t%ALT\t.\t.\t.\tGT\t[%GT]\n"   # 10 cols → the vcf_call layout
+    try:
+        out = subprocess.run(["bcftools", "query", "-r", regions, "-f", fmt, p],
+                             check=True, capture_output=True, text=True, timeout=1200).stdout
+    except Exception:
+        return None
+    return [ln.split("\t") for ln in out.splitlines() if ln.strip()]
+
+
+def query_vcf(path, pos_index, wanted):
+    """{rsid: gt} for `wanted` rsIDs from a VCF. Fast path: bcftools region query
+    over pos_index's positions (used only when every wanted rsID has coordinates,
+    so nothing that needs ID-column matching is missed). Fallback: stream the file
+    (which also catches rsIDs matched by their ID column when coords are unknown)."""
+    if pos_index and set(wanted) <= set(pos_index.values()):
+        recs = _bcftools_regions(path, list(pos_index.keys()))
+        if recs is not None:
+            out = {}
+            for cols in recs:
+                call = vcf_call(cols, pos_index)
+                if call and call[0] in wanted:
+                    out[call[0]] = call[1]
+            return out
+    out = {}
+    with open_text(path) as f:
+        for line in f:
+            if line.startswith("#") or not line.strip():
+                continue
+            call = vcf_call(line.rstrip("\n").split("\t"), pos_index or None)
+            if call and call[0] in wanted:
+                out[call[0]] = call[1]
+                if len(out) == len(wanted):
+                    break
+    return out
+
+
 # ── Matching ─────────────────────────────────────────────────────────────────
 def match(user_gt, genotypes):
     """genotypes: {catalogue_gt: interpretation}. Try the user genotype directly,
@@ -280,18 +351,20 @@ def main():
     if not args:
         sys.exit("usage: import_dna.py <genome.txt|.vcf> [--build 37|38]   |   --self-check")
 
-    text = read_genome_text(args[0])
+    src = args[0]
+    header = read_header(src)
     catalogue = json.loads(CATALOGUE.read_text())
-    fmt = detect_format(text)
+    fmt = detect_format(header)
     if fmt != "vcf":
-        genome, build = parse_23andme(text), "37"        # 23andMe/AncestryDNA are GRCh37
+        genome, build = parse_23andme(read_genome_text(src)), "37"   # 23andMe/AncestryDNA are GRCh37
     else:
-        build = build_override or detect_build(text)
+        build = build_override or detect_build(header)
         if build is None:
             build = DEFAULT_BUILD
             print(f"warning: could not detect genome build from the VCF header; "
-                  f"assuming GRCh{build}. If position matches look low, retry with --build 37.")
-        genome = parse_vcf(text, build_pos_index(catalogue, build))
+                  f"assuming GRCh{build}. If matches look low, retry with --build 37.")
+        pos_index = build_pos_index(catalogue, build)
+        genome = query_vcf(src, pos_index, set(pos_index.values()))   # bcftools if available, else scan
 
     conn = sqlite3.connect(DB)
     cat_ids = dict(conn.execute("SELECT name_en, id FROM categories").fetchall())
@@ -302,8 +375,7 @@ def main():
         rows)
     conn.commit()
     conn.close()
-    print(f"Format {fmt}, build GRCh{build}. Genotyped {len(genome)} rsIDs; "
-          f"matched {len(rows)} catalogued variants.")
+    print(f"Format {fmt}, build GRCh{build}. Matched {len(rows)} catalogued variants.")
     print("Next: python3 viewer.py")
     print("Tip: the whole genome stays queryable — `python3 lookup_variant.py <rsID ...>` "
           "for any variant, catalogued or not.")
@@ -343,6 +415,18 @@ def _self_check():
     assert apoe_call({"rs429358": "CT", "rs7412": "CC"})["genotype"] == "ε3/ε4"
     assert apoe_call({"rs429358": "CC", "rs7412": "CC"})["zygosity"] == "hom-alt"
     assert apoe_call({"rs429358": "TT"}) is None       # needs both SNPs
+    # query_vcf: same result whether bcftools serves it or the stdlib fallback does
+    import tempfile
+    idx = build_pos_index({"rs9": {"chrom": "1", "pos": {"38": 11796321}}}, "38")
+    with tempfile.NamedTemporaryFile("w", suffix=".vcf", delete=False) as tf:
+        tf.write("##fileformat=VCFv4.2\n#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tS\n")
+        tf.write("1\t11796321\t.\tG\tA\t.\t.\t.\tGT\t0/1\n")   # un-annotated (ID '.')
+        vpath = tf.name
+    try:
+        assert query_vcf(vpath, idx, {"rs9"}) == {"rs9": "GA"}, "query_vcf"
+        assert query_vcf(vpath, {}, {"rsX"}) == {}, "query_vcf empty"
+    finally:
+        os.unlink(vpath)
     print("self-check OK")
 
 

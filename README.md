@@ -1,12 +1,15 @@
 # Health Tracker
 
-A local, private, dependency-free tracker for your lab results, DNA, and imaging reports.
+A local, private tracker for your lab results, DNA, and imaging reports.
 Drop your data in, and it builds a single self-contained `viewer.html` with charts,
 genetic-variant interpretations, per-category insights, and a consolidated protocol.
 
 Designed to be driven with [Claude Code](https://claude.com/claude-code) (or any coding
 agent): **you don't write parsers** — you ask Claude to read your messy lab PDFs/screenshots
-and import them. Everything is Python standard library; nothing leaves your machine.
+and import them. It runs on Python's standard library, plus optional `bcftools` for fast VCF
+queries (a pure-Python scan is used when it's absent). Your health data stays on your machine;
+the only network call sends a public rsID — never your genotypes — to Ensembl to locate an
+uncatalogued variant (`--offline` skips it).
 
 ## Quick start
 

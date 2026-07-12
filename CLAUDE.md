@@ -98,8 +98,9 @@ queryable on demand. To analyze a topic that needs SNPs beyond the catalogue:
    ```bash
    python3 lookup_variant.py rs1801133 rs662 rs1229984   # genotype + interpretation if catalogued
    ```
-   It streams the file (gzip-ok, WGS-safe) and auto-detects the build. For an un-annotated VCF
-   it resolves any requested rsID's position from Ensembl on demand — so you're not limited to
+   It reads the VCF with bcftools when available (fast random access on a bgzipped, tabix-indexed
+   file) or a pure-Python scan otherwise, and auto-detects the build. For an un-annotated VCF it
+   resolves any requested rsID's position from Ensembl on demand — so you're not limited to
    catalogued rsIDs (`--offline` skips the network and uses catalogue coordinates only). A
    resolved position with no record in the VCF is reported as homozygous reference. Read-only —
    it never writes the DB.
@@ -152,6 +153,7 @@ items actually in use.
 
 - After ANY db change, run `python3 viewer.py`.
 - `test_results.value` is TEXT, not numeric.
-- No dependencies beyond the Python standard library.
+- Python standard library only, plus optional `bcftools` for fast VCF querying (auto-detected;
+  a pure-Python scan runs when it's absent). Chart.js loads from a CDN in the generated HTML.
 - **Privacy:** this is personal medical data. Keep `labs.db`, `inputs/`, and generated
   exports out of git (see `.gitignore`); share only the code and the synthetic seed.
