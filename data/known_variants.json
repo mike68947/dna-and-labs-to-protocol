@@ -1,5 +1,5 @@
 {
- "_README": "Curated SNP catalogue for import_dna.py. Add entries freely: key = rsID, value = {gene, category (a category name_en from schema.sql), note, genotypes{gt:interpretation}, risk[optional]}. Common-variant effects are small and often population-specific — read as a lean, not a diagnosis.",
+ "_README": "Curated SNP catalogue for import_dna.py. Add entries freely: key = rsID, value = {gene, category (a category name_en from schema.sql), note, genotypes{gt:interpretation}, risk[optional]}. The `chrom` and `pos`{37,38} fields are filled by enrich_variants.py (from Ensembl) so import_dna.py can match un-annotated VCFs by position on either genome build — run `python3 enrich_variants.py` after adding rsIDs. Common-variant effects are small and often population-specific — read as a lean, not a diagnosis.",
  "rs4244285": {
   "gene": "CYP2C19",
   "category": "Drug Metabolism (Pharmacogenomics)",
@@ -12,7 +12,12 @@
   "risk": [
    "AG",
    "AA"
-  ]
+  ],
+  "chrom": "10",
+  "pos": {
+   "37": 96541616,
+   "38": 94781859
+  }
  },
  "rs4986893": {
   "gene": "CYP2C19",
@@ -26,7 +31,12 @@
   "risk": [
    "AG",
    "AA"
-  ]
+  ],
+  "chrom": "10",
+  "pos": {
+   "37": 96540410,
+   "38": 94780653
+  }
  },
  "rs12248560": {
   "gene": "CYP2C19",
@@ -36,6 +46,11 @@
    "CC": "Normal",
    "CT": "Rapid metabolizer",
    "TT": "Ultrarapid — faster activation; bleeding risk with some drugs"
+  },
+  "chrom": "10",
+  "pos": {
+   "37": 96521657,
+   "38": 94761900
   }
  },
  "rs1799853": {
@@ -50,7 +65,12 @@
   "risk": [
    "CT",
    "TT"
-  ]
+  ],
+  "chrom": "10",
+  "pos": {
+   "37": 96702047,
+   "38": 94942290
+  }
  },
  "rs1057910": {
   "gene": "CYP2C9",
@@ -64,7 +84,12 @@
   "risk": [
    "AC",
    "CC"
-  ]
+  ],
+  "chrom": "10",
+  "pos": {
+   "37": 96741053,
+   "38": 94981296
+  }
  },
  "rs9923231": {
   "gene": "VKORC1",
@@ -78,7 +103,12 @@
   "risk": [
    "AG",
    "AA"
-  ]
+  ],
+  "chrom": "16",
+  "pos": {
+   "37": 31107689,
+   "38": 31096368
+  }
  },
  "rs1142345": {
   "gene": "TPMT",
@@ -92,7 +122,12 @@
   "risk": [
    "AG",
    "GG"
-  ]
+  ],
+  "chrom": "6",
+  "pos": {
+   "37": 18130918,
+   "38": 18130687
+  }
  },
  "rs1800460": {
   "gene": "TPMT",
@@ -106,7 +141,12 @@
   "risk": [
    "CT",
    "TT"
-  ]
+  ],
+  "chrom": "6",
+  "pos": {
+   "37": 18139228,
+   "38": 18138997
+  }
  },
  "rs116855232": {
   "gene": "NUDT15",
@@ -120,7 +160,12 @@
   "risk": [
    "CT",
    "TT"
-  ]
+  ],
+  "chrom": "13",
+  "pos": {
+   "37": 48619855,
+   "38": 48045719
+  }
  },
  "rs4149056": {
   "gene": "SLCO1B1",
@@ -134,7 +179,12 @@
   "risk": [
    "CT",
    "CC"
-  ]
+  ],
+  "chrom": "12",
+  "pos": {
+   "37": 21331549,
+   "38": 21178615
+  }
  },
  "rs3918290": {
   "gene": "DPYD",
@@ -148,7 +198,12 @@
   "risk": [
    "CT",
    "TT"
-  ]
+  ],
+  "chrom": "1",
+  "pos": {
+   "37": 97915614,
+   "38": 97450058
+  }
  },
  "rs3892097": {
   "gene": "CYP2D6",
@@ -162,7 +217,12 @@
   "risk": [
    "CT",
    "TT"
-  ]
+  ],
+  "chrom": "22",
+  "pos": {
+   "37": 42524947,
+   "38": 42128945
+  }
  },
  "rs776746": {
   "gene": "CYP3A5",
@@ -172,6 +232,11 @@
    "CC": "Non-expresser (*3/*3) — standard tacrolimus dose",
    "CT": "Expresser — higher dose needed",
    "TT": "Expresser — higher tacrolimus dose"
+  },
+  "chrom": "7",
+  "pos": {
+   "37": 99270539,
+   "38": 99672916
   }
  },
  "rs2231142": {
@@ -186,7 +251,12 @@
   "risk": [
    "GT",
    "TT"
-  ]
+  ],
+  "chrom": "4",
+  "pos": {
+   "37": 89052323,
+   "38": 88131171
+  }
  },
  "rs2802292": {
   "gene": "FOXO3",
@@ -196,6 +266,11 @@
    "GG": "Two copies of the longevity-associated allele",
    "GT": "One copy of the longevity allele",
    "TT": "No copies (non-longevity genotype)"
+  },
+  "chrom": "6",
+  "pos": {
+   "37": 108908518,
+   "38": 108587315
   }
  },
  "rs2075650": {
@@ -210,7 +285,12 @@
   "risk": [
    "AG",
    "GG"
-  ]
+  ],
+  "chrom": "19",
+  "pos": {
+   "37": 45395619,
+   "38": 44892362
+  }
  },
  "rs1042522": {
   "gene": "TP53",
@@ -220,6 +300,11 @@
    "GG": "Arg/Arg — stronger apoptosis",
    "CG": "Pro/Arg",
    "CC": "Pro/Pro — associated with longevity in some cohorts, weaker tumor suppression"
+  },
+  "chrom": "17",
+  "pos": {
+   "37": 7579472,
+   "38": 7676154
   }
  },
  "rs5882": {
@@ -230,6 +315,11 @@
    "AA": "Val/Val — larger HDL, longevity-associated in some studies",
    "AG": "Intermediate",
    "GG": "Ile/Ile"
+  },
+  "chrom": "16",
+  "pos": {
+   "37": 57016092,
+   "38": 56982180
   }
  },
  "rs9536314": {
@@ -240,6 +330,11 @@
    "TT": "Non-carrier",
    "GT": "KL-VS heterozygote — associated with better cognition/longevity",
    "GG": "KL-VS homozygote — may be less favorable"
+  },
+  "chrom": "13",
+  "pos": {
+   "37": 33628138,
+   "38": 33054001
   }
  },
  "rs1800795": {
@@ -253,7 +348,12 @@
   },
   "risk": [
    "GG"
-  ]
+  ],
+  "chrom": "7",
+  "pos": {
+   "37": 22766645,
+   "38": 22727026
+  }
  },
  "rs4880": {
   "gene": "SOD2",
@@ -263,6 +363,11 @@
    "TT": "Val/Val",
    "CT": "Ala/Val",
    "CC": "Ala/Ala — efficient MnSOD import"
+  },
+  "chrom": "6",
+  "pos": {
+   "37": 160113872,
+   "38": 159692840
   }
  },
  "rs1801133": {
@@ -276,7 +381,12 @@
   },
   "risk": [
    "AA"
-  ]
+  ],
+  "chrom": "1",
+  "pos": {
+   "37": 11856378,
+   "38": 11796321
+  }
  },
  "rs1801131": {
   "gene": "MTHFR",
@@ -286,6 +396,11 @@
    "TT": "Normal",
    "GT": "One 1298C allele — mild effect",
    "GG": "1298CC — reduced activity, esp. combined with 677T"
+  },
+  "chrom": "1",
+  "pos": {
+   "37": 11854476,
+   "38": 11794419
   }
  },
  "rs602662": {
@@ -296,6 +411,11 @@
    "GG": "Secretor",
    "AG": "Secretor",
    "AA": "Non-secretor — higher serum B12 readings, altered gut microbiome, norovirus resistance"
+  },
+  "chrom": "19",
+  "pos": {
+   "37": 49206985,
+   "38": 48703728
   }
  },
  "rs601338": {
@@ -306,6 +426,11 @@
    "GG": "Secretor",
    "AG": "Secretor",
    "AA": "Non-secretor — altered gut microbiome & mucosal glycans"
+  },
+  "chrom": "19",
+  "pos": {
+   "37": 49206674,
+   "38": 48703417
   }
  },
  "rs4988235": {
@@ -319,7 +444,12 @@
   },
   "risk": [
    "CC"
-  ]
+  ],
+  "chrom": "2",
+  "pos": {
+   "37": 136608646,
+   "38": 135851076
+  }
  },
  "rs762551": {
   "gene": "CYP1A2",
@@ -333,7 +463,12 @@
   "risk": [
    "AC",
    "CC"
-  ]
+  ],
+  "chrom": "15",
+  "pos": {
+   "37": 75041917,
+   "38": 74749576
+  }
  },
  "rs1229984": {
   "gene": "ADH1B",
@@ -343,6 +478,11 @@
    "CC": "Slower alcohol metabolism (typical)",
    "CT": "Faster — reduced alcohol dependence risk",
    "TT": "Fast metabolizer"
+  },
+  "chrom": "4",
+  "pos": {
+   "37": 100239319,
+   "38": 99318162
   }
  },
  "rs671": {
@@ -357,7 +497,12 @@
   "risk": [
    "AG",
    "AA"
-  ]
+  ],
+  "chrom": "12",
+  "pos": {
+   "37": 112241766,
+   "38": 111803962
+  }
  },
  "rs9939609": {
   "gene": "FTO",
@@ -371,7 +516,12 @@
   "risk": [
    "AT",
    "AA"
-  ]
+  ],
+  "chrom": "16",
+  "pos": {
+   "37": 53820527,
+   "38": 53786615
+  }
  },
  "rs7903146": {
   "gene": "TCF7L2",
@@ -385,7 +535,12 @@
   "risk": [
    "CT",
    "TT"
-  ]
+  ],
+  "chrom": "10",
+  "pos": {
+   "37": 114758349,
+   "38": 112998590
+  }
  },
  "rs2282679": {
   "gene": "GC",
@@ -398,7 +553,12 @@
   },
   "risk": [
    "GG"
-  ]
+  ],
+  "chrom": "4",
+  "pos": {
+   "37": 72608383,
+   "38": 71742666
+  }
  },
  "rs2228570": {
   "gene": "VDR",
@@ -408,6 +568,11 @@
    "GG": "FF — more active receptor",
    "AG": "Ff",
    "AA": "ff — less active receptor, associated with lower bone density"
+  },
+  "chrom": "12",
+  "pos": {
+   "37": 48272895,
+   "38": 47879112
   }
  },
  "rs1815739": {
@@ -418,6 +583,11 @@
    "CC": "RR — power/sprint-oriented",
    "CT": "RX — mixed",
    "TT": "XX — endurance-leaning; no fast-twitch α-actinin-3"
+  },
+  "chrom": "11",
+  "pos": {
+   "37": 66328095,
+   "38": 66560624
   }
  },
  "rs8192678": {
@@ -428,6 +598,11 @@
    "CC": "Gly/Gly — favorable endurance response",
    "CT": "Gly/Ser",
    "TT": "Ser/Ser — blunted endurance adaptation in some studies"
+  },
+  "chrom": "4",
+  "pos": {
+   "37": 23815662,
+   "38": 23814039
   }
  },
  "rs4253778": {
@@ -438,6 +613,11 @@
    "GG": "Endurance-leaning",
    "CG": "Mixed",
    "CC": "Power/strength-leaning"
+  },
+  "chrom": "22",
+  "pos": {
+   "37": 46630634,
+   "38": 46234737
   }
  },
  "rs1333049": {
@@ -452,7 +632,12 @@
   "risk": [
    "CG",
    "CC"
-  ]
+  ],
+  "chrom": "9",
+  "pos": {
+   "37": 22125503,
+   "38": 22125504
+  }
  },
  "rs662": {
   "gene": "PON1",
@@ -462,6 +647,11 @@
    "TT": "Q/Q",
    "CT": "Q/R",
    "CC": "R/R — altered antioxidant activity"
+  },
+  "chrom": "7",
+  "pos": {
+   "37": 94937446,
+   "38": 95308134
   }
  },
  "rs5186": {
@@ -476,7 +666,12 @@
   "risk": [
    "AC",
    "CC"
-  ]
+  ],
+  "chrom": "3",
+  "pos": {
+   "37": 148459988,
+   "38": 148742201
+  }
  },
  "rs1799983": {
   "gene": "NOS3",
@@ -490,7 +685,12 @@
   "risk": [
    "GT",
    "TT"
-  ]
+  ],
+  "chrom": "7",
+  "pos": {
+   "37": 150696111,
+   "38": 150999023
+  }
  },
  "rs1800562": {
   "gene": "HFE",
@@ -504,7 +704,12 @@
   "risk": [
    "AG",
    "AA"
-  ]
+  ],
+  "chrom": "6",
+  "pos": {
+   "37": 26093141,
+   "38": 26092913
+  }
  },
  "rs1799945": {
   "gene": "HFE",
@@ -518,7 +723,12 @@
   "risk": [
    "CG",
    "GG"
-  ]
+  ],
+  "chrom": "6",
+  "pos": {
+   "37": 26091179,
+   "38": 26090951
+  }
  },
  "rs6025": {
   "gene": "F5",
@@ -532,7 +742,12 @@
   "risk": [
    "CT",
    "TT"
-  ]
+  ],
+  "chrom": "1",
+  "pos": {
+   "37": 169519049,
+   "38": 169549811
+  }
  },
  "rs1799963": {
   "gene": "F2",
@@ -546,7 +761,12 @@
   "risk": [
    "AG",
    "AA"
-  ]
+  ],
+  "chrom": "11",
+  "pos": {
+   "37": 46761055,
+   "38": 46739505
+  }
  },
  "rs429358": {
   "gene": "APOE",
@@ -556,6 +776,11 @@
    "TT": "No ε4 determinant here",
    "CT": "One ε4 determinant",
    "CC": "Two ε4 determinants"
+  },
+  "chrom": "19",
+  "pos": {
+   "37": 45411941,
+   "38": 44908684
   }
  },
  "rs7412": {
@@ -566,6 +791,11 @@
    "CC": "No ε2 determinant here",
    "CT": "One ε2 determinant",
    "TT": "Two ε2 determinants"
+  },
+  "chrom": "19",
+  "pos": {
+   "37": 45412079,
+   "38": 44908822
   }
  }
 }

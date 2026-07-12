@@ -66,17 +66,26 @@ You extract the values — there's no format parser, that's the point.
 ## Importing DNA
 
 ```bash
-python3 import_dna.py inputs/genome.txt   # 23andMe/AncestryDNA raw OR .vcf; auto-detected
+python3 import_dna.py inputs/genome.txt          # 23andMe/AncestryDNA raw OR .vcf; auto-detected
+python3 import_dna.py inputs/genome.vcf --build 38   # force build if the VCF header is ambiguous
 ```
 It matches the file against `data/known_variants.json` (a curated ~46-SNP catalogue spanning
 pharmacogenomics, longevity, nutrition, fitness, and cardiovascular/iron risk), tries both
 DNA strands, handles APOE's two-SNP ε genotype, and writes interpreted rows into `variants`.
 `example_genome.txt` is a synthetic file for testing.
 
+**VCF matching:** by rsID (the ID column) when present; when the ID column is blank (`.`, as in
+a raw whole-genome VCF), it falls back to matching by chromosome + position. Positions are
+build-specific, so the genome build (GRCh37/hg19 vs GRCh38/hg38) is auto-detected from the VCF
+header (`##contig` lengths or a `##reference`/assembly string) — override with `--build 37|38`.
+23andMe/AncestryDNA raw files are always GRCh37.
+
 **To cover more variants:** add entries to `data/known_variants.json` (see its `_README`):
 `rsID → {gene, category (a name_en from schema.sql), note, genotypes{gt: interpretation},
-risk[]}`. Keep interpretations honest — common-variant effects are small and often
-population-specific. Then re-run `import_dna.py` + `viewer.py`.
+risk[]}`. Then run `python3 enrich_variants.py` to backfill `chrom` + dual-build `pos` from
+Ensembl (needed only for the position fallback; rsID matching works without it). Keep
+interpretations honest — common-variant effects are small and often population-specific.
+Re-run `import_dna.py` + `viewer.py`.
 
 ## Importing imaging / reports
 

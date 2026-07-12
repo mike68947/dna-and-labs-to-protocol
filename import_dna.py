@@ -13,9 +13,18 @@ strand, so every match is tried directly AND reverse-complemented before giving
 up. No external dependencies (pure stdlib) — no bcftools, snpEff or reference
 genome needed; a curated catalogue of well-characterized SNPs is enough.
 
+VCFs are matched by rsID (the ID column). When that's blank ('.', typical of a
+raw whole-genome VCF), matching falls back to chrom:pos. Positions are build-
+specific, so the genome build is auto-detected from the VCF header — override
+with --build 37|38. 23andMe/AncestryDNA raw files are always GRCh37. Run
+enrich_variants.py once to add coordinates for any new catalogue entries.
+
+    python3 import_dna.py inputs/genome.vcf --build 38
+
 Extend coverage by adding entries to data/known_variants.json (see its _README).
 """
 import json
+import re
 import sqlite3
 import sys
 from pathlib import Path
@@ -35,6 +44,63 @@ def rc(gt):
 def canon(gt):
     """Order-independent key for a 2-allele genotype: 'GA' -> 'AG'."""
     return "".join(sorted(gt.upper()))
+
+
+# ── Genome build (for the chrom:pos fallback) ────────────────────────────────
+DEFAULT_BUILD = "38"
+
+
+def norm_chrom(c):
+    """Normalize a chromosome name: 'chr1'->'1', 'chrX'->'X', 'M'/'MT'->'MT'."""
+    c = str(c).strip()
+    if c[:3].lower() == "chr":
+        c = c[3:]
+    u = c.upper()
+    return "MT" if u in ("M", "MT") else u
+
+
+# A few canonical chromosome lengths per build — a reliable build fingerprint.
+_CONTIG_LEN = {
+    "1": {"249250621": "37", "248956422": "38"},
+    "2": {"243199373": "37", "242193529": "38"},
+    "X": {"155270560": "37", "156040895": "38"},
+}
+
+
+def detect_build(text):
+    """Infer the genome build from a VCF header: '37' | '38' | None.
+    Prefers ##contig length fingerprints; falls back to reference/assembly strings."""
+    hint = None
+    for line in text.splitlines():
+        if not line.startswith("#"):
+            break
+        if line.startswith("##contig"):
+            m_id = re.search(r"ID=([^,>]+)", line)
+            m_len = re.search(r"length=(\d+)", line)
+            if m_id and m_len:
+                fam = _CONTIG_LEN.get(norm_chrom(m_id.group(1)))
+                if fam and m_len.group(1) in fam:
+                    return fam[m_len.group(1)]
+        low = line.lower()
+        if hint is None:
+            if "grch38" in low or "hg38" in low:
+                hint = "38"
+            elif "grch37" in low or "hg19" in low or "b37" in low:
+                hint = "37"
+    return hint
+
+
+def build_pos_index(catalogue, build):
+    """{(chrom, pos): rsid} for the given build, from catalogue coordinates."""
+    idx = {}
+    for rsid, rec in catalogue.items():
+        if rsid.startswith("_"):
+            continue
+        pos = (rec.get("pos") or {}).get(build)
+        chrom = rec.get("chrom")
+        if pos and chrom:
+            idx[(norm_chrom(str(chrom)), int(pos))] = rsid
+    return idx
 
 
 # ── Parsing ──────────────────────────────────────────────────────────────────
@@ -66,8 +132,10 @@ def parse_23andme(text):
     return out
 
 
-def parse_vcf(text):
-    """Return {rsid: 'CT'} from the GT field of a single-sample VCF."""
+def parse_vcf(text, pos_index=None):
+    """Return {rsid: 'CT'} from a single-sample VCF. The rsID comes from the ID
+    column; if that's blank ('.') and pos_index is given, it's recovered from
+    (chrom, pos) — that's how un-annotated VCFs get matched."""
     out = {}
     for line in text.splitlines():
         if line.startswith("#") or not line.strip():
@@ -75,20 +143,20 @@ def parse_vcf(text):
         c = line.split("\t")
         if len(c) < 10:
             continue
-        rsid, ref, alt = c[2], c[3], c[4].split(",")
+        chrom, pos, vid, ref, alt = c[0], c[1], c[2], c[3], c[4].split(",")
+        rsid = vid if vid.startswith("rs") else None
+        if rsid is None and pos_index is not None and pos.isdigit():
+            rsid = pos_index.get((norm_chrom(chrom), int(pos)))
+        if not rsid:
+            continue
         alleles = [ref] + alt
         idx = c[9].split(":")[0].replace("|", "/").split("/")
         called = [alleles[int(i)] for i in idx
                   if i not in (".", "") and i.isdigit() and int(i) < len(alleles)]
         gt = "".join(called)
-        if rsid.startswith("rs") and len(gt) == 2 and set(gt) <= set("ACGT"):
+        if len(gt) == 2 and set(gt) <= set("ACGT"):
             out[rsid] = gt
     return out
-
-
-def load_genome(path):
-    text = Path(path).read_text()
-    return (parse_vcf if detect_format(text) == "vcf" else parse_23andme)(text)
 
 
 # ── Matching ─────────────────────────────────────────────────────────────────
@@ -176,11 +244,29 @@ def main():
     if "--self-check" in sys.argv:
         _self_check()
         return
-    args = [a for a in sys.argv[1:] if not a.startswith("-")]
+    argv = sys.argv[1:]
+    build_override = None
+    if "--build" in argv:
+        i = argv.index("--build")
+        build_override = argv[i + 1] if i + 1 < len(argv) else None
+        argv = argv[:i] + argv[i + 2:]
+    args = [a for a in argv if not a.startswith("-")]
     if not args:
-        sys.exit("usage: import_dna.py <genome.txt|.vcf>   |   --self-check")
-    genome = load_genome(args[0])
+        sys.exit("usage: import_dna.py <genome.txt|.vcf> [--build 37|38]   |   --self-check")
+
+    text = Path(args[0]).read_text()
     catalogue = json.loads(CATALOGUE.read_text())
+    fmt = detect_format(text)
+    if fmt != "vcf":
+        genome, build = parse_23andme(text), "37"        # 23andMe/AncestryDNA are GRCh37
+    else:
+        build = build_override or detect_build(text)
+        if build is None:
+            build = DEFAULT_BUILD
+            print(f"warning: could not detect genome build from the VCF header; "
+                  f"assuming GRCh{build}. If position matches look low, retry with --build 37.")
+        genome = parse_vcf(text, build_pos_index(catalogue, build))
+
     conn = sqlite3.connect(DB)
     cat_ids = dict(conn.execute("SELECT name_en, id FROM categories").fetchall())
     rows = build_rows(genome, catalogue, cat_ids)
@@ -190,7 +276,8 @@ def main():
         rows)
     conn.commit()
     conn.close()
-    print(f"Genotyped {len(genome)} rsIDs; matched {len(rows)} catalogued variants.")
+    print(f"Format {fmt}, build GRCh{build}. Genotyped {len(genome)} rsIDs; "
+          f"matched {len(rows)} catalogued variants.")
     print("Next: python3 viewer.py")
 
 
@@ -203,6 +290,17 @@ def _self_check():
     assert parse_vcf("#CHROM\tPOS\nx\t1\trs1\tC\tT\t.\t.\t.\tGT\t0/1\n") == {"rs1": "CT"}
     assert detect_format("##fileformat=VCFv4.2\n") == "vcf"
     assert detect_format("rs1\t1\t2\tAA\n") == "23andme"
+    # genome-build detection: contig-length fingerprint, reference string, or unknown
+    assert norm_chrom("chr1") == "1" and norm_chrom("chrX") == "X" and norm_chrom("MT") == "MT"
+    assert detect_build("##contig=<ID=chr1,length=249250621>\n") == "37"
+    assert detect_build("##contig=<ID=1,length=248956422>\n") == "38"
+    assert detect_build("##reference=file:///ref/GRCh38.fa\n#CHROM\n") == "38"
+    assert detect_build("##fileformat=VCFv4.2\n#CHROM\n") is None
+    # chrom:pos fallback for an un-annotated VCF (ID '.'), build-specific
+    idx38 = build_pos_index({"rs9": {"chrom": "1", "pos": {"37": 11856378, "38": 11796321}}}, "38")
+    assert parse_vcf("1\t11796321\t.\tG\tA\t.\t.\t.\tGT\t0/1\n", idx38) == {"rs9": "GA"}
+    assert parse_vcf("chr1\t11796321\t.\tG\tA\t.\t.\t.\tGT\t1|1\n", idx38) == {"rs9": "AA"}
+    assert parse_vcf("1\t11856378\t.\tG\tA\t.\t.\t.\tGT\t0/1\n", idx38) == {}   # GRCh37 pos, wrong build
     # direct match, and strand-flip match (user 'AA' vs catalogue listing 'TT')
     genos = {"CC": "non-persistent", "CT": "persistent", "TT": "persistent"}
     assert match("TT", genos) == "persistent"

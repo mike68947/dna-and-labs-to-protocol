@@ -19,7 +19,7 @@ open viewer.html       # explore the example immediately
 Then replace the example with your own data:
 
 ```bash
-# DNA (23andMe/AncestryDNA raw export, or a VCF):
+# DNA (23andMe/AncestryDNA raw export, or a VCF — annotated or raw):
 python3 import_dna.py path/to/your_genome.txt
 python3 viewer.py
 
@@ -49,6 +49,7 @@ here are small, population-dependent leans, not diagnoses. Confirm anything acti
 ## Files
 
 `schema.sql` (data model) · `init_db.py` (create+seed) · `viewer.py` (build the HTML) ·
-`import_dna.py` (DNA) · `inspect_import.py` (unit-error screen) · `seed_ref_ranges.py` ·
-`screening_calendar.py` · `export_*_for_llm.py` · `data/` (seed + variant catalogue) ·
-`CLAUDE.md` (the agent playbook).
+`import_dna.py` (DNA; VCF or 23andMe, matches by rsID or, for raw VCFs, chrom:pos with genome-
+build auto-detection) · `enrich_variants.py` (backfill variant coordinates from Ensembl) ·
+`inspect_import.py` (unit-error screen) · `seed_ref_ranges.py` · `screening_calendar.py` ·
+`export_*_for_llm.py` · `data/` (seed + variant catalogue) · `CLAUDE.md` (the agent playbook).
