@@ -1,0 +1,21 @@
+# Example 23andMe-style raw genome (synthetic — for testing import_dna.py).
+# Format: rsid <tab> chromosome <tab> position <tab> genotype
+# Try it:  python3 import_dna.py example_genome.txt && python3 viewer.py
+rs429358	19	44908684	CT
+rs7412	19	44908822	CC
+rs2802292	6	108587315	GT
+rs1801133	1	11856378	CT
+rs1801131	1	11854476	GT
+rs4988235	2	136608646	GG
+rs602662	19	48703728	AG
+rs4244285	10	94781859	AG
+rs4149056	12	21331549	TT
+rs1799853	10	96702047	CC
+rs1815739	11	66560624	CT
+rs8192678	4	23815662	CT
+rs1799945	6	26091179	CG
+rs7903146	10	114758349	CT
+rs9939609	16	53820527	AT
+rs1333049	9	22125503	CG
+rs762551	15	75041917	AC
+rs4880	6	160113872	CT

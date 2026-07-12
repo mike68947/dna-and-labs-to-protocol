@@ -1,0 +1,840 @@
+{
+ "biomarkers": [
+  {
+   "id": 1,
+   "name": "Hemoglobin",
+   "specimen": "Blood",
+   "unit": "g/L",
+   "cats": [
+    2
+   ]
+  },
+  {
+   "id": 2,
+   "name": "White Blood Cells",
+   "specimen": "Blood",
+   "unit": "×10⁹/L",
+   "cats": [
+    2
+   ]
+  },
+  {
+   "id": 3,
+   "name": "Platelets",
+   "specimen": "Blood",
+   "unit": "×10⁹/L",
+   "cats": [
+    2
+   ]
+  },
+  {
+   "id": 4,
+   "name": "Glucose (fasting)",
+   "specimen": "Blood (serum)",
+   "unit": "mmol/L",
+   "cats": [
+    3
+   ]
+  },
+  {
+   "id": 5,
+   "name": "HbA1c",
+   "specimen": "Blood",
+   "unit": "%",
+   "cats": [
+    3
+   ],
+   "opt_low": 4.0,
+   "opt_high": 5.4
+  },
+  {
+   "id": 6,
+   "name": "Insulin (fasting)",
+   "specimen": "Blood (serum)",
+   "unit": "µU/mL",
+   "cats": [
+    3
+   ]
+  },
+  {
+   "id": 7,
+   "name": "Total Cholesterol",
+   "specimen": "Blood (serum)",
+   "unit": "mmol/L",
+   "cats": [
+    4
+   ]
+  },
+  {
+   "id": 8,
+   "name": "LDL Cholesterol",
+   "specimen": "Blood (serum)",
+   "unit": "mmol/L",
+   "cats": [
+    4
+   ]
+  },
+  {
+   "id": 9,
+   "name": "HDL Cholesterol",
+   "specimen": "Blood (serum)",
+   "unit": "mmol/L",
+   "cats": [
+    4
+   ]
+  },
+  {
+   "id": 10,
+   "name": "Triglycerides",
+   "specimen": "Blood (serum)",
+   "unit": "mmol/L",
+   "cats": [
+    4
+   ]
+  },
+  {
+   "id": 11,
+   "name": "Apolipoprotein B",
+   "specimen": "Blood (serum)",
+   "unit": "g/L",
+   "cats": [
+    5,
+    4
+   ],
+   "opt_high": 0.8
+  },
+  {
+   "id": 12,
+   "name": "Lipoprotein(a)",
+   "specimen": "Blood (serum)",
+   "unit": "nmol/L",
+   "cats": [
+    5
+   ]
+  },
+  {
+   "id": 13,
+   "name": "ALT",
+   "specimen": "Blood (serum)",
+   "unit": "U/L",
+   "cats": [
+    6
+   ]
+  },
+  {
+   "id": 14,
+   "name": "AST",
+   "specimen": "Blood (serum)",
+   "unit": "U/L",
+   "cats": [
+    6
+   ]
+  },
+  {
+   "id": 15,
+   "name": "Creatinine",
+   "specimen": "Blood (serum)",
+   "unit": "µmol/L",
+   "cats": [
+    7
+   ]
+  },
+  {
+   "id": 16,
+   "name": "eGFR",
+   "specimen": "Blood (serum)",
+   "unit": "mL/min/1.73m²",
+   "cats": [
+    7
+   ]
+  },
+  {
+   "id": 17,
+   "name": "Sodium",
+   "specimen": "Blood (serum)",
+   "unit": "mmol/L",
+   "cats": [
+    8
+   ]
+  },
+  {
+   "id": 18,
+   "name": "Potassium",
+   "specimen": "Blood (serum)",
+   "unit": "mmol/L",
+   "cats": [
+    8
+   ]
+  },
+  {
+   "id": 19,
+   "name": "Magnesium",
+   "specimen": "Blood (serum)",
+   "unit": "mmol/L",
+   "cats": [
+    8
+   ]
+  },
+  {
+   "id": 20,
+   "name": "TSH",
+   "specimen": "Blood (serum)",
+   "unit": "mIU/L",
+   "cats": [
+    9
+   ]
+  },
+  {
+   "id": 21,
+   "name": "Free T4",
+   "specimen": "Blood (serum)",
+   "unit": "pmol/L",
+   "cats": [
+    9
+   ]
+  },
+  {
+   "id": 22,
+   "name": "Testosterone (total)",
+   "specimen": "Blood (serum)",
+   "unit": "nmol/L",
+   "cats": [
+    10
+   ]
+  },
+  {
+   "id": 23,
+   "name": "Cortisol (morning)",
+   "specimen": "Blood (serum)",
+   "unit": "nmol/L",
+   "cats": [
+    10
+   ]
+  },
+  {
+   "id": 24,
+   "name": "hs-CRP",
+   "specimen": "Blood (serum)",
+   "unit": "mg/L",
+   "cats": [
+    11,
+    5
+   ],
+   "opt_high": 1.0
+  },
+  {
+   "id": 25,
+   "name": "Ferritin",
+   "specimen": "Blood (serum)",
+   "unit": "µg/L",
+   "cats": [
+    12
+   ]
+  },
+  {
+   "id": 26,
+   "name": "Iron",
+   "specimen": "Blood (serum)",
+   "unit": "µmol/L",
+   "cats": [
+    12
+   ]
+  },
+  {
+   "id": 27,
+   "name": "Vitamin D (25-OH)",
+   "specimen": "Blood (serum)",
+   "unit": "nmol/L",
+   "cats": [
+    13
+   ],
+   "opt_low": 75.0,
+   "opt_high": 125.0
+  },
+  {
+   "id": 28,
+   "name": "Vitamin B12",
+   "specimen": "Blood (serum)",
+   "unit": "pmol/L",
+   "cats": [
+    13
+   ]
+  },
+  {
+   "id": 29,
+   "name": "Homocysteine",
+   "specimen": "Blood (serum)",
+   "unit": "µmol/L",
+   "cats": [
+    13,
+    5
+   ],
+   "opt_high": 8.0
+  },
+  {
+   "id": 30,
+   "name": "Creatine Kinase",
+   "specimen": "Blood (serum)",
+   "unit": "U/L",
+   "cats": [
+    16
+   ]
+  }
+ ],
+ "results": [
+  {
+   "bid": 1,
+   "date": "2024-03-15",
+   "value": "150"
+  },
+  {
+   "bid": 1,
+   "date": "2025-03-20",
+   "value": "152"
+  },
+  {
+   "bid": 1,
+   "date": "2026-03-10",
+   "value": "149"
+  },
+  {
+   "bid": 2,
+   "date": "2024-03-15",
+   "value": "5.8"
+  },
+  {
+   "bid": 2,
+   "date": "2025-03-20",
+   "value": "6.1"
+  },
+  {
+   "bid": 2,
+   "date": "2026-03-10",
+   "value": "5.5"
+  },
+  {
+   "bid": 3,
+   "date": "2024-03-15",
+   "value": "240"
+  },
+  {
+   "bid": 3,
+   "date": "2025-03-20",
+   "value": "255"
+  },
+  {
+   "bid": 3,
+   "date": "2026-03-10",
+   "value": "248"
+  },
+  {
+   "bid": 4,
+   "date": "2024-03-15",
+   "value": "5.2"
+  },
+  {
+   "bid": 4,
+   "date": "2025-03-20",
+   "value": "5.1"
+  },
+  {
+   "bid": 4,
+   "date": "2026-03-10",
+   "value": "5.3"
+  },
+  {
+   "bid": 5,
+   "date": "2024-03-15",
+   "value": "5.3"
+  },
+  {
+   "bid": 5,
+   "date": "2025-03-20",
+   "value": "5.4"
+  },
+  {
+   "bid": 5,
+   "date": "2026-03-10",
+   "value": "5.2"
+  },
+  {
+   "bid": 6,
+   "date": "2024-03-15",
+   "value": "7.5"
+  },
+  {
+   "bid": 6,
+   "date": "2025-03-20",
+   "value": "6.8"
+  },
+  {
+   "bid": 6,
+   "date": "2026-03-10",
+   "value": "8.0"
+  },
+  {
+   "bid": 7,
+   "date": "2024-03-15",
+   "value": "5.4"
+  },
+  {
+   "bid": 7,
+   "date": "2025-03-20",
+   "value": "5.1"
+  },
+  {
+   "bid": 7,
+   "date": "2026-03-10",
+   "value": "4.9"
+  },
+  {
+   "bid": 8,
+   "date": "2024-03-15",
+   "value": "3.4"
+  },
+  {
+   "bid": 8,
+   "date": "2025-03-20",
+   "value": "3.1"
+  },
+  {
+   "bid": 8,
+   "date": "2026-03-10",
+   "value": "2.9"
+  },
+  {
+   "bid": 9,
+   "date": "2024-03-15",
+   "value": "1.3"
+  },
+  {
+   "bid": 9,
+   "date": "2025-03-20",
+   "value": "1.35"
+  },
+  {
+   "bid": 9,
+   "date": "2026-03-10",
+   "value": "1.4"
+  },
+  {
+   "bid": 10,
+   "date": "2024-03-15",
+   "value": "1.4"
+  },
+  {
+   "bid": 10,
+   "date": "2025-03-20",
+   "value": "1.2"
+  },
+  {
+   "bid": 10,
+   "date": "2026-03-10",
+   "value": "1.1"
+  },
+  {
+   "bid": 11,
+   "date": "2024-03-15",
+   "value": "0.95"
+  },
+  {
+   "bid": 11,
+   "date": "2025-03-20",
+   "value": "0.88"
+  },
+  {
+   "bid": 11,
+   "date": "2026-03-10",
+   "value": "0.82"
+  },
+  {
+   "bid": 12,
+   "date": "2024-03-15",
+   "value": "45"
+  },
+  {
+   "bid": 12,
+   "date": "2025-03-20",
+   "value": "45"
+  },
+  {
+   "bid": 12,
+   "date": "2026-03-10",
+   "value": "45"
+  },
+  {
+   "bid": 13,
+   "date": "2024-03-15",
+   "value": "28"
+  },
+  {
+   "bid": 13,
+   "date": "2025-03-20",
+   "value": "25"
+  },
+  {
+   "bid": 13,
+   "date": "2026-03-10",
+   "value": "22"
+  },
+  {
+   "bid": 14,
+   "date": "2024-03-15",
+   "value": "24"
+  },
+  {
+   "bid": 14,
+   "date": "2025-03-20",
+   "value": "23"
+  },
+  {
+   "bid": 14,
+   "date": "2026-03-10",
+   "value": "21"
+  },
+  {
+   "bid": 15,
+   "date": "2024-03-15",
+   "value": "88"
+  },
+  {
+   "bid": 15,
+   "date": "2025-03-20",
+   "value": "90"
+  },
+  {
+   "bid": 15,
+   "date": "2026-03-10",
+   "value": "89"
+  },
+  {
+   "bid": 16,
+   "date": "2024-03-15",
+   "value": "92"
+  },
+  {
+   "bid": 16,
+   "date": "2025-03-20",
+   "value": "90"
+  },
+  {
+   "bid": 16,
+   "date": "2026-03-10",
+   "value": "91"
+  },
+  {
+   "bid": 17,
+   "date": "2024-03-15",
+   "value": "140"
+  },
+  {
+   "bid": 17,
+   "date": "2025-03-20",
+   "value": "141"
+  },
+  {
+   "bid": 17,
+   "date": "2026-03-10",
+   "value": "139"
+  },
+  {
+   "bid": 18,
+   "date": "2024-03-15",
+   "value": "4.3"
+  },
+  {
+   "bid": 18,
+   "date": "2025-03-20",
+   "value": "4.4"
+  },
+  {
+   "bid": 18,
+   "date": "2026-03-10",
+   "value": "4.2"
+  },
+  {
+   "bid": 19,
+   "date": "2024-03-15",
+   "value": "0.85"
+  },
+  {
+   "bid": 19,
+   "date": "2025-03-20",
+   "value": "0.88"
+  },
+  {
+   "bid": 19,
+   "date": "2026-03-10",
+   "value": "0.86"
+  },
+  {
+   "bid": 20,
+   "date": "2024-03-15",
+   "value": "2.1"
+  },
+  {
+   "bid": 20,
+   "date": "2025-03-20",
+   "value": "1.9"
+  },
+  {
+   "bid": 20,
+   "date": "2026-03-10",
+   "value": "2.3"
+  },
+  {
+   "bid": 21,
+   "date": "2024-03-15",
+   "value": "15"
+  },
+  {
+   "bid": 21,
+   "date": "2025-03-20",
+   "value": "16"
+  },
+  {
+   "bid": 21,
+   "date": "2026-03-10",
+   "value": "15.5"
+  },
+  {
+   "bid": 22,
+   "date": "2024-03-15",
+   "value": "18"
+  },
+  {
+   "bid": 22,
+   "date": "2025-03-20",
+   "value": "19"
+  },
+  {
+   "bid": 22,
+   "date": "2026-03-10",
+   "value": "17.5"
+  },
+  {
+   "bid": 23,
+   "date": "2024-03-15",
+   "value": "380"
+  },
+  {
+   "bid": 23,
+   "date": "2025-03-20",
+   "value": "350"
+  },
+  {
+   "bid": 23,
+   "date": "2026-03-10",
+   "value": "400"
+  },
+  {
+   "bid": 24,
+   "date": "2024-03-15",
+   "value": "1.8"
+  },
+  {
+   "bid": 24,
+   "date": "2025-03-20",
+   "value": "1.2"
+  },
+  {
+   "bid": 24,
+   "date": "2026-03-10",
+   "value": "0.9"
+  },
+  {
+   "bid": 25,
+   "date": "2024-03-15",
+   "value": "120"
+  },
+  {
+   "bid": 25,
+   "date": "2025-03-20",
+   "value": "140"
+  },
+  {
+   "bid": 25,
+   "date": "2026-03-10",
+   "value": "130"
+  },
+  {
+   "bid": 26,
+   "date": "2024-03-15",
+   "value": "18"
+  },
+  {
+   "bid": 26,
+   "date": "2025-03-20",
+   "value": "20"
+  },
+  {
+   "bid": 26,
+   "date": "2026-03-10",
+   "value": "19"
+  },
+  {
+   "bid": 27,
+   "date": "2024-03-15",
+   "value": "62"
+  },
+  {
+   "bid": 27,
+   "date": "2025-03-20",
+   "value": "78"
+  },
+  {
+   "bid": 27,
+   "date": "2026-03-10",
+   "value": "85"
+  },
+  {
+   "bid": 28,
+   "date": "2024-03-15",
+   "value": "350"
+  },
+  {
+   "bid": 28,
+   "date": "2025-03-20",
+   "value": "380"
+  },
+  {
+   "bid": 28,
+   "date": "2026-03-10",
+   "value": "400"
+  },
+  {
+   "bid": 29,
+   "date": "2024-03-15",
+   "value": "11"
+  },
+  {
+   "bid": 29,
+   "date": "2025-03-20",
+   "value": "9.5"
+  },
+  {
+   "bid": 29,
+   "date": "2026-03-10",
+   "value": "8.5"
+  },
+  {
+   "bid": 30,
+   "date": "2024-03-15",
+   "value": "140"
+  },
+  {
+   "bid": 30,
+   "date": "2025-03-20",
+   "value": "160"
+  },
+  {
+   "bid": 30,
+   "date": "2026-03-10",
+   "value": "150"
+  }
+ ],
+ "insights": [
+  {
+   "category_id": 4,
+   "insight": "(Example insight — synthetic demo data. Replace with your own via CLAUDE.md.)\n\nLipids are trending favorably over three draws: LDL 3.4 → 2.9 mmol/L, triglycerides 1.4 → 1.1, HDL nudging up to 1.4. Total cholesterol 4.9 mmol/L. The residual lever is ApoB (see Cardiovascular Risk) — the particle-count marker that tracks atherogenic risk better than LDL-C alone.",
+   "supplements": "• Omega-3 (EPA/DHA) 1–2 g/day — lowers triglycerides.\n• Consider dietary fiber (psyllium 5–10 g/day) — modest LDL reduction.",
+   "diet": "Mediterranean pattern: olive oil, oily fish 2×/week, legumes, nuts. Limit refined carbs and saturated fat; both move triglycerides and LDL.",
+   "activity": "150 min/week Zone-2 cardio + 2 resistance sessions raises HDL and improves particle size.",
+   "lifestyle": "Alcohol moderation directly lowers triglycerides.",
+   "checkup_schedule": "Recheck full lipid panel + ApoB every 6–12 months while intervening.",
+   "concordance": null
+  },
+  {
+   "category_id": 5,
+   "insight": "(Example insight — synthetic demo data. Replace with your own via CLAUDE.md.)\n\nApoB 0.82 g/L is just above the 0.80 optimal ceiling but falling (0.95 → 0.82). hs-CRP has normalized to 0.9 mg/L (below the 1.0 optimal line). Lp(a) 45 nmol/L is moderate and genetically fixed — it raises baseline risk independent of LDL.",
+   "insight_dna": "APOE ε3/ε4 carries one ε4 allele: expect higher LDL/ApoB and a stronger response to saturated-fat reduction. NOS3 and 9p21 status (if present in your DNA import) further shape endothelial and coronary risk. This is a lean, not a diagnosis.",
+   "supplements": "• Continue omega-3.\n• If ApoB stays >0.8 despite diet, discuss a statin with your clinician (SLCO1B1 genotype informs statin choice — see Drug Metabolism).",
+   "diet": "Prioritize saturated-fat reduction — ε4 carriers are especially diet-responsive.",
+   "activity": "Regular aerobic exercise improves endothelial (NO-mediated) function.",
+   "lifestyle": "No smoking; manage blood pressure — both compound genetic CV risk.",
+   "checkup_schedule": "ApoB + hs-CRP every 6 months; one-time Lp(a) is sufficient (it's stable for life). Consider a coronary artery calcium (CAC) scan for risk restratification.",
+   "concordance": "APOE ε4 → higher ApoB|elevated ApoB|ApoB 0.82 g/L, trending down|PARTIAL\nLp(a) genetic elevation → added CV risk|higher baseline risk|Lp(a) 45 nmol/L (moderate)|CONFIRMS\nInflammatory risk|elevated hs-CRP|hs-CRP normalized to 0.9 mg/L|FAVORABLE"
+  },
+  {
+   "category_id": 15,
+   "insight": "(Example insight — synthetic demo data. Replace with your own via CLAUDE.md.)\n\nPharmacogenomic genotypes flag how you metabolize common drugs. Review these with any prescriber before starting a new medication — they change drug choice and dose, not just risk.",
+   "insight_dna": "CYP2C19 *1/*2 (intermediate) — reduced clopidogrel activation; consider an alternative antiplatelet if indicated. SLCO1B1 normal (*1/*1) — standard statin tolerance expected. Always confirm with clinical PGx testing before acting.",
+   "checkup_schedule": "No routine labs — this is a fixed genetic reference. Revisit when a new prescription is considered.",
+   "concordance": null
+  },
+  {
+   "category_id": 1,
+   "insight": "(Example insight — synthetic demo data. Replace with your own via CLAUDE.md.)\n\nMetabolic and inflammatory markers are in good shape (HbA1c 5.2%, hs-CRP 0.9, fasting insulin 8 µU/mL), which are the biomarkers that most move biological age. Vitamin D has climbed into the optimal band (85 nmol/L) and homocysteine is approaching its 8 µmol/L target.",
+   "insight_dna": "APOE ε3/ε4 (one ε4 allele) and FOXO3 rs2802292 G/T (one longevity allele) are the two headline longevity variants here. ε4 modestly raises Alzheimer's/CV risk; the FOXO3 G allele is centenarian-associated. Common-variant longevity effects are individually small — read as a lean, not a verdict.",
+   "checkup_schedule": "Annual metabolic + inflammatory panel; these drive most of the modifiable aging signal.",
+   "concordance": null
+  }
+ ],
+ "variants": [
+  {
+   "category_id": 1,
+   "rsid": "rs429358",
+   "gene": "APOE",
+   "genotype": "ε3/ε4",
+   "zygosity": "het",
+   "relevance": "ε3/ε4 — one ε4 allele: higher LDL, cardiovascular and Alzheimer's risk"
+  },
+  {
+   "category_id": 1,
+   "rsid": "rs2802292",
+   "gene": "FOXO3",
+   "genotype": "GT",
+   "zygosity": "het",
+   "relevance": "One copy of the longevity-associated G allele"
+  },
+  {
+   "category_id": 13,
+   "rsid": "rs1801133",
+   "gene": "MTHFR",
+   "genotype": "CT",
+   "zygosity": "het",
+   "relevance": "~65% MTHFR activity — modest homocysteine effect; ensure adequate folate/B12"
+  },
+  {
+   "category_id": 14,
+   "rsid": "rs4988235",
+   "gene": "MCM6",
+   "genotype": "CC",
+   "zygosity": "hom-alt",
+   "relevance": "Lactase non-persistent — likely lactose intolerant in adulthood"
+  },
+  {
+   "category_id": 15,
+   "rsid": "rs4244285",
+   "gene": "CYP2C19",
+   "genotype": "AG",
+   "zygosity": "het",
+   "relevance": "Intermediate metabolizer — reduced activation of clopidogrel"
+  },
+  {
+   "category_id": 15,
+   "rsid": "rs4149056",
+   "gene": "SLCO1B1",
+   "genotype": "TT",
+   "zygosity": "hom-ref",
+   "relevance": "Normal transport — standard statin tolerance expected"
+  },
+  {
+   "category_id": 16,
+   "rsid": "rs1815739",
+   "gene": "ACTN3",
+   "genotype": "CT",
+   "zygosity": "het",
+   "relevance": "RX — mixed power/endurance muscle profile"
+  },
+  {
+   "category_id": 12,
+   "rsid": "rs1799945",
+   "gene": "HFE",
+   "genotype": "CG",
+   "zygosity": "het",
+   "relevance": "H63D carrier — mild iron-loading potential; watch ferritin/transferrin saturation"
+  }
+ ],
+ "unified_protocol": "═══ EXAMPLE MASTER PROTOCOL ═══\n\nThis is synthetic demo content. Your Claude regenerates it from your own labs,\nvariants, and stack — see CLAUDE.md (\"Synthesizing the master protocol\").\n\n═══ A. SUPPLEMENTS ═══\n\n─── Tier 1 (evidence-backed, targeted) ───\n• Omega-3 (EPA/DHA) 1–2 g/day — triglycerides 1.1 mmol/L, cardiovascular support.\n• Vitamin D3 2000 IU/day — 25-OH-D 85 nmol/L (in optimal band); maintain, don't exceed.\n\n─── Tier 2 (supportive) ───\n• Magnesium glycinate 200–400 mg/day — sleep, glucose handling.\n• Methylfolate + B12 — MTHFR C677T heterozygous; keeps homocysteine ≤8 µmol/L.\n\n═══ B. DIET ═══\nMediterranean pattern; saturated-fat reduction prioritized (APOE ε4). Lactose-free\ndairy or lactase enzyme (MCM6 non-persistent).\n\n═══ C. ACTIVITY ═══\n150 min/week Zone-2 cardio + 2 resistance sessions.\n\n═══ D. LIFESTYLE ═══\n7–9 h sleep; no smoking; alcohol moderation (also lowers triglycerides).\n\n═══ E. MONITORING ═══\nApoB + hs-CRP every 6 months; full lipids + metabolic panel annually; one-time Lp(a).\n\n═══ H. PHARMACOGENOMICS ═══\nCYP2C19 intermediate — flag before clopidogrel. SLCO1B1 normal — statins standard.\n"
+}

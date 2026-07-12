@@ -1,0 +1,152 @@
+{
+ "1": {
+  "low": 130,
+  "high": 170,
+  "source": "population reference (example)"
+ },
+ "2": {
+  "low": 4.0,
+  "high": 9.0,
+  "source": "population reference (example)"
+ },
+ "3": {
+  "low": 150,
+  "high": 400,
+  "source": "population reference (example)"
+ },
+ "4": {
+  "low": 3.9,
+  "high": 5.6,
+  "source": "population reference (example)"
+ },
+ "5": {
+  "low": 4.0,
+  "high": 5.6,
+  "source": "population reference (example)"
+ },
+ "6": {
+  "low": 2.6,
+  "high": 24.9,
+  "source": "population reference (example)"
+ },
+ "7": {
+  "low": null,
+  "high": 5.2,
+  "source": "population reference (example)"
+ },
+ "8": {
+  "low": null,
+  "high": 3.0,
+  "source": "population reference (example)"
+ },
+ "9": {
+  "low": 1.0,
+  "high": null,
+  "source": "population reference (example)"
+ },
+ "10": {
+  "low": null,
+  "high": 1.7,
+  "source": "population reference (example)"
+ },
+ "11": {
+  "low": 0.5,
+  "high": 1.2,
+  "source": "population reference (example)"
+ },
+ "12": {
+  "low": null,
+  "high": 75,
+  "source": "population reference (example)"
+ },
+ "13": {
+  "low": null,
+  "high": 41,
+  "source": "population reference (example)"
+ },
+ "14": {
+  "low": null,
+  "high": 40,
+  "source": "population reference (example)"
+ },
+ "15": {
+  "low": 60,
+  "high": 110,
+  "source": "population reference (example)"
+ },
+ "16": {
+  "low": 90,
+  "high": null,
+  "source": "population reference (example)"
+ },
+ "17": {
+  "low": 136,
+  "high": 145,
+  "source": "population reference (example)"
+ },
+ "18": {
+  "low": 3.5,
+  "high": 5.1,
+  "source": "population reference (example)"
+ },
+ "19": {
+  "low": 0.75,
+  "high": 0.95,
+  "source": "population reference (example)"
+ },
+ "20": {
+  "low": 0.4,
+  "high": 4.0,
+  "source": "population reference (example)"
+ },
+ "21": {
+  "low": 12,
+  "high": 22,
+  "source": "population reference (example)"
+ },
+ "22": {
+  "low": 8.6,
+  "high": 29,
+  "source": "population reference (example)"
+ },
+ "23": {
+  "low": 171,
+  "high": 536,
+  "source": "population reference (example)"
+ },
+ "24": {
+  "low": null,
+  "high": 3.0,
+  "source": "population reference (example)"
+ },
+ "25": {
+  "low": 30,
+  "high": 400,
+  "source": "population reference (example)"
+ },
+ "26": {
+  "low": 11,
+  "high": 32,
+  "source": "population reference (example)"
+ },
+ "27": {
+  "low": 50,
+  "high": 250,
+  "source": "population reference (example)"
+ },
+ "28": {
+  "low": 138,
+  "high": 652,
+  "source": "population reference (example)"
+ },
+ "29": {
+  "low": null,
+  "high": 15,
+  "source": "population reference (example)"
+ },
+ "30": {
+  "low": 30,
+  "high": 200,
+  "source": "population reference (example)"
+ }
+}

@@ -1,0 +1,571 @@
+{
+ "_README": "Curated SNP catalogue for import_dna.py. Add entries freely: key = rsID, value = {gene, category (a category name_en from schema.sql), note, genotypes{gt:interpretation}, risk[optional]}. Common-variant effects are small and often population-specific — read as a lean, not a diagnosis.",
+ "rs4244285": {
+  "gene": "CYP2C19",
+  "category": "Drug Metabolism (Pharmacogenomics)",
+  "note": "*2 loss-of-function",
+  "genotypes": {
+   "GG": "Normal metabolizer",
+   "AG": "Intermediate metabolizer — reduced activation of clopidogrel",
+   "AA": "Poor metabolizer — clopidogrel likely ineffective; consider alternative"
+  },
+  "risk": [
+   "AG",
+   "AA"
+  ]
+ },
+ "rs4986893": {
+  "gene": "CYP2C19",
+  "category": "Drug Metabolism (Pharmacogenomics)",
+  "note": "*3 loss-of-function (more common in East Asians)",
+  "genotypes": {
+   "GG": "Normal",
+   "AG": "Intermediate metabolizer",
+   "AA": "Poor metabolizer"
+  },
+  "risk": [
+   "AG",
+   "AA"
+  ]
+ },
+ "rs12248560": {
+  "gene": "CYP2C19",
+  "category": "Drug Metabolism (Pharmacogenomics)",
+  "note": "*17 increased function",
+  "genotypes": {
+   "CC": "Normal",
+   "CT": "Rapid metabolizer",
+   "TT": "Ultrarapid — faster activation; bleeding risk with some drugs"
+  }
+ },
+ "rs1799853": {
+  "gene": "CYP2C9",
+  "category": "Drug Metabolism (Pharmacogenomics)",
+  "note": "*2; warfarin/NSAID clearance",
+  "genotypes": {
+   "CC": "Normal",
+   "CT": "Intermediate — slower warfarin/NSAID clearance",
+   "TT": "Reduced — lower doses"
+  },
+  "risk": [
+   "CT",
+   "TT"
+  ]
+ },
+ "rs1057910": {
+  "gene": "CYP2C9",
+  "category": "Drug Metabolism (Pharmacogenomics)",
+  "note": "*3; strong effect on warfarin dose",
+  "genotypes": {
+   "AA": "Normal",
+   "AC": "Intermediate metabolizer",
+   "CC": "Poor metabolizer — much lower warfarin dose"
+  },
+  "risk": [
+   "AC",
+   "CC"
+  ]
+ },
+ "rs9923231": {
+  "gene": "VKORC1",
+  "category": "Drug Metabolism (Pharmacogenomics)",
+  "note": "-1639G>A warfarin sensitivity",
+  "genotypes": {
+   "GG": "Normal warfarin dose",
+   "AG": "Increased sensitivity — lower dose",
+   "AA": "High sensitivity — much lower dose"
+  },
+  "risk": [
+   "AG",
+   "AA"
+  ]
+ },
+ "rs1142345": {
+  "gene": "TPMT",
+  "category": "Drug Metabolism (Pharmacogenomics)",
+  "note": "*3C; thiopurine toxicity",
+  "genotypes": {
+   "AA": "Normal TPMT activity",
+   "AG": "Intermediate — reduce thiopurine dose",
+   "GG": "Deficient — high toxicity risk"
+  },
+  "risk": [
+   "AG",
+   "GG"
+  ]
+ },
+ "rs1800460": {
+  "gene": "TPMT",
+  "category": "Drug Metabolism (Pharmacogenomics)",
+  "note": "*3B; thiopurine toxicity",
+  "genotypes": {
+   "CC": "Normal",
+   "CT": "Intermediate activity",
+   "TT": "Deficient"
+  },
+  "risk": [
+   "CT",
+   "TT"
+  ]
+ },
+ "rs116855232": {
+  "gene": "NUDT15",
+  "category": "Drug Metabolism (Pharmacogenomics)",
+  "note": "thiopurine toxicity (esp. East Asian)",
+  "genotypes": {
+   "CC": "Normal",
+   "CT": "Intermediate — reduce thiopurine dose",
+   "TT": "Poor — severe myelosuppression risk"
+  },
+  "risk": [
+   "CT",
+   "TT"
+  ]
+ },
+ "rs4149056": {
+  "gene": "SLCO1B1",
+  "category": "Drug Metabolism (Pharmacogenomics)",
+  "note": "*5 Val174Ala; statin myopathy",
+  "genotypes": {
+   "TT": "Normal transport",
+   "CT": "Intermediate — mild statin myopathy risk",
+   "CC": "Low function — higher simvastatin myopathy risk"
+  },
+  "risk": [
+   "CT",
+   "CC"
+  ]
+ },
+ "rs3918290": {
+  "gene": "DPYD",
+  "category": "Drug Metabolism (Pharmacogenomics)",
+  "note": "*2A splice; fluoropyrimidine toxicity",
+  "genotypes": {
+   "CC": "Normal DPD activity",
+   "CT": "Carrier — severe 5-FU/capecitabine toxicity risk",
+   "TT": "DPD deficient — avoid fluoropyrimidines"
+  },
+  "risk": [
+   "CT",
+   "TT"
+  ]
+ },
+ "rs3892097": {
+  "gene": "CYP2D6",
+  "category": "Drug Metabolism (Pharmacogenomics)",
+  "note": "*4 non-functional; many antidepressants/opioids",
+  "genotypes": {
+   "CC": "Normal metabolizer",
+   "CT": "Intermediate metabolizer",
+   "TT": "Poor metabolizer — altered response to CYP2D6 drugs (codeine, tamoxifen, SSRIs)"
+  },
+  "risk": [
+   "CT",
+   "TT"
+  ]
+ },
+ "rs776746": {
+  "gene": "CYP3A5",
+  "category": "Drug Metabolism (Pharmacogenomics)",
+  "note": "*3; tacrolimus dosing",
+  "genotypes": {
+   "CC": "Non-expresser (*3/*3) — standard tacrolimus dose",
+   "CT": "Expresser — higher dose needed",
+   "TT": "Expresser — higher tacrolimus dose"
+  }
+ },
+ "rs2231142": {
+  "gene": "ABCG2",
+  "category": "Drug Metabolism (Pharmacogenomics)",
+  "note": "Q141K; rosuvastatin & allopurinol exposure",
+  "genotypes": {
+   "GG": "Normal",
+   "GT": "Reduced transport — higher drug exposure",
+   "TT": "Low function — higher rosuvastatin/allopurinol levels"
+  },
+  "risk": [
+   "GT",
+   "TT"
+  ]
+ },
+ "rs2802292": {
+  "gene": "FOXO3",
+  "category": "Biological Age & Longevity",
+  "note": "G = centenarian-associated allele",
+  "genotypes": {
+   "GG": "Two copies of the longevity-associated allele",
+   "GT": "One copy of the longevity allele",
+   "TT": "No copies (non-longevity genotype)"
+  }
+ },
+ "rs2075650": {
+  "gene": "TOMM40",
+  "category": "Biological Age & Longevity",
+  "note": "near APOE; Alzheimer's & longevity signal",
+  "genotypes": {
+   "AA": "Common genotype",
+   "AG": "One risk allele — modest Alzheimer's risk (LD with APOE ε4)",
+   "GG": "Higher-risk genotype"
+  },
+  "risk": [
+   "AG",
+   "GG"
+  ]
+ },
+ "rs1042522": {
+  "gene": "TP53",
+  "category": "Biological Age & Longevity",
+  "note": "Pro72Arg; apoptosis vs longevity trade-off",
+  "genotypes": {
+   "GG": "Arg/Arg — stronger apoptosis",
+   "CG": "Pro/Arg",
+   "CC": "Pro/Pro — associated with longevity in some cohorts, weaker tumor suppression"
+  }
+ },
+ "rs5882": {
+  "gene": "CETP",
+  "category": "Biological Age & Longevity",
+  "note": "I405V; HDL size & longevity",
+  "genotypes": {
+   "AA": "Val/Val — larger HDL, longevity-associated in some studies",
+   "AG": "Intermediate",
+   "GG": "Ile/Ile"
+  }
+ },
+ "rs9536314": {
+  "gene": "KLOTHO",
+  "category": "Biological Age & Longevity",
+  "note": "KL-VS; cognition & longevity",
+  "genotypes": {
+   "TT": "Non-carrier",
+   "GT": "KL-VS heterozygote — associated with better cognition/longevity",
+   "GG": "KL-VS homozygote — may be less favorable"
+  }
+ },
+ "rs1800795": {
+  "gene": "IL6",
+  "category": "Inflammation & Immunity",
+  "note": "-174 G>C; IL-6 expression",
+  "genotypes": {
+   "GG": "Higher IL-6 expression",
+   "CG": "Intermediate",
+   "CC": "Lower IL-6 expression (often favorable)"
+  },
+  "risk": [
+   "GG"
+  ]
+ },
+ "rs4880": {
+  "gene": "SOD2",
+  "category": "Inflammation & Immunity",
+  "note": "Ala16Val; mitochondrial antioxidant targeting",
+  "genotypes": {
+   "TT": "Val/Val",
+   "CT": "Ala/Val",
+   "CC": "Ala/Ala — efficient MnSOD import"
+  }
+ },
+ "rs1801133": {
+  "gene": "MTHFR",
+  "category": "Vitamins",
+  "note": "C677T; folate metabolism (verify strand)",
+  "genotypes": {
+   "GG": "Normal MTHFR activity",
+   "AG": "~65% activity — modest homocysteine effect",
+   "AA": "~30% activity (677TT) — favour methylfolate, monitor homocysteine/B12"
+  },
+  "risk": [
+   "AA"
+  ]
+ },
+ "rs1801131": {
+  "gene": "MTHFR",
+  "category": "Vitamins",
+  "note": "A1298C; folate metabolism",
+  "genotypes": {
+   "TT": "Normal",
+   "GT": "One 1298C allele — mild effect",
+   "GG": "1298CC — reduced activity, esp. combined with 677T"
+  }
+ },
+ "rs602662": {
+  "gene": "FUT2",
+  "category": "Gut & Microbiome",
+  "note": "secretor status; affects B12 & microbiome",
+  "genotypes": {
+   "GG": "Secretor",
+   "AG": "Secretor",
+   "AA": "Non-secretor — higher serum B12 readings, altered gut microbiome, norovirus resistance"
+  }
+ },
+ "rs601338": {
+  "gene": "FUT2",
+  "category": "Gut & Microbiome",
+  "note": "W143X nonsense; secretor status",
+  "genotypes": {
+   "GG": "Secretor",
+   "AG": "Secretor",
+   "AA": "Non-secretor — altered gut microbiome & mucosal glycans"
+  }
+ },
+ "rs4988235": {
+  "gene": "MCM6",
+  "category": "Gut & Microbiome",
+  "note": "-13910 lactase persistence",
+  "genotypes": {
+   "TT": "Lactase persistent",
+   "CT": "Lactase persistent (heterozygous)",
+   "CC": "Lactase non-persistent — likely lactose intolerant in adulthood"
+  },
+  "risk": [
+   "CC"
+  ]
+ },
+ "rs762551": {
+  "gene": "CYP1A2",
+  "category": "Metabolic & Glucose",
+  "note": "caffeine metabolism",
+  "genotypes": {
+   "AA": "Fast caffeine metabolizer",
+   "AC": "Slow metabolizer",
+   "CC": "Slow metabolizer — caffeine may raise CV risk / disrupt sleep more"
+  },
+  "risk": [
+   "AC",
+   "CC"
+  ]
+ },
+ "rs1229984": {
+  "gene": "ADH1B",
+  "category": "Metabolic & Glucose",
+  "note": "His48Arg; alcohol metabolism",
+  "genotypes": {
+   "CC": "Slower alcohol metabolism (typical)",
+   "CT": "Faster — reduced alcohol dependence risk",
+   "TT": "Fast metabolizer"
+  }
+ },
+ "rs671": {
+  "gene": "ALDH2",
+  "category": "Metabolic & Glucose",
+  "note": "E487K; alcohol flush (East Asian)",
+  "genotypes": {
+   "GG": "Normal ALDH2",
+   "AG": "Reduced activity — alcohol flush, higher esophageal cancer risk with drinking",
+   "AA": "Inactive — strong flush; avoid alcohol"
+  },
+  "risk": [
+   "AG",
+   "AA"
+  ]
+ },
+ "rs9939609": {
+  "gene": "FTO",
+  "category": "Metabolic & Glucose",
+  "note": "appetite / obesity risk",
+  "genotypes": {
+   "TT": "Lower-risk genotype",
+   "AT": "One risk allele — modestly higher BMI/appetite",
+   "AA": "Two risk alleles — higher obesity risk; responsive to protein/exercise"
+  },
+  "risk": [
+   "AT",
+   "AA"
+  ]
+ },
+ "rs7903146": {
+  "gene": "TCF7L2",
+  "category": "Metabolic & Glucose",
+  "note": "strongest common type-2 diabetes variant",
+  "genotypes": {
+   "CC": "Lower-risk genotype",
+   "CT": "One risk allele — higher T2D risk",
+   "TT": "Two risk alleles — notably higher T2D risk; prioritise glycemic control"
+  },
+  "risk": [
+   "CT",
+   "TT"
+  ]
+ },
+ "rs2282679": {
+  "gene": "GC",
+  "category": "Vitamins",
+  "note": "vitamin-D binding protein; 25-OH-D levels",
+  "genotypes": {
+   "TT": "Higher vitamin D binding protein / 25-OH-D",
+   "GT": "Intermediate",
+   "GG": "Lower 25-OH-D — may need more vitamin D"
+  },
+  "risk": [
+   "GG"
+  ]
+ },
+ "rs2228570": {
+  "gene": "VDR",
+  "category": "Vitamins",
+  "note": "FokI; vitamin D receptor activity",
+  "genotypes": {
+   "GG": "FF — more active receptor",
+   "AG": "Ff",
+   "AA": "ff — less active receptor, associated with lower bone density"
+  }
+ },
+ "rs1815739": {
+  "gene": "ACTN3",
+  "category": "Fitness & Muscle",
+  "note": "R577X; fast-twitch α-actinin-3",
+  "genotypes": {
+   "CC": "RR — power/sprint-oriented",
+   "CT": "RX — mixed",
+   "TT": "XX — endurance-leaning; no fast-twitch α-actinin-3"
+  }
+ },
+ "rs8192678": {
+  "gene": "PPARGC1A",
+  "category": "Fitness & Muscle",
+  "note": "Gly482Ser; mitochondrial biogenesis",
+  "genotypes": {
+   "CC": "Gly/Gly — favorable endurance response",
+   "CT": "Gly/Ser",
+   "TT": "Ser/Ser — blunted endurance adaptation in some studies"
+  }
+ },
+ "rs4253778": {
+  "gene": "PPARA",
+  "category": "Fitness & Muscle",
+  "note": "endurance vs power fibre balance",
+  "genotypes": {
+   "GG": "Endurance-leaning",
+   "CG": "Mixed",
+   "CC": "Power/strength-leaning"
+  }
+ },
+ "rs1333049": {
+  "gene": "CDKN2B-AS1 (9p21)",
+  "category": "Cardiovascular Risk",
+  "note": "9p21 coronary artery disease locus",
+  "genotypes": {
+   "GG": "Lower-risk genotype",
+   "CG": "One risk allele — modestly higher CAD risk",
+   "CC": "Two risk alleles — higher CAD risk"
+  },
+  "risk": [
+   "CG",
+   "CC"
+  ]
+ },
+ "rs662": {
+  "gene": "PON1",
+  "category": "Cardiovascular Risk",
+  "note": "Q192R; paraoxonase / LDL oxidation",
+  "genotypes": {
+   "TT": "Q/Q",
+   "CT": "Q/R",
+   "CC": "R/R — altered antioxidant activity"
+  }
+ },
+ "rs5186": {
+  "gene": "AGTR1",
+  "category": "Cardiovascular Risk",
+  "note": "A1166C; hypertension risk",
+  "genotypes": {
+   "AA": "Common genotype",
+   "AC": "One C allele — modestly higher blood-pressure sensitivity",
+   "CC": "Higher hypertension risk"
+  },
+  "risk": [
+   "AC",
+   "CC"
+  ]
+ },
+ "rs1799983": {
+  "gene": "NOS3",
+  "category": "Cardiovascular Risk",
+  "note": "Glu298Asp; endothelial NO synthase",
+  "genotypes": {
+   "GG": "Glu/Glu — normal NO production",
+   "GT": "Glu/Asp — modestly reduced NO",
+   "TT": "Asp/Asp — lower NO, associated with hypertension/endothelial dysfunction"
+  },
+  "risk": [
+   "GT",
+   "TT"
+  ]
+ },
+ "rs1800562": {
+  "gene": "HFE",
+  "category": "Iron Studies",
+  "note": "C282Y; hereditary hemochromatosis",
+  "genotypes": {
+   "GG": "No C282Y",
+   "AG": "C282Y carrier — usually benign; watch ferritin/transferrin sat",
+   "AA": "C282Y homozygote — high hemochromatosis risk; monitor iron overload"
+  },
+  "risk": [
+   "AG",
+   "AA"
+  ]
+ },
+ "rs1799945": {
+  "gene": "HFE",
+  "category": "Iron Studies",
+  "note": "H63D; milder iron-loading variant",
+  "genotypes": {
+   "CC": "No H63D",
+   "CG": "H63D carrier — mild effect",
+   "GG": "H63D homozygote — mild iron-loading, higher with co-inherited C282Y"
+  },
+  "risk": [
+   "CG",
+   "GG"
+  ]
+ },
+ "rs6025": {
+  "gene": "F5",
+  "category": "Cardiovascular Risk",
+  "note": "Factor V Leiden; venous thrombosis",
+  "genotypes": {
+   "CC": "No Factor V Leiden",
+   "CT": "Carrier — elevated venous thrombosis risk (esp. with estrogen/immobility)",
+   "TT": "Homozygous — high thrombosis risk"
+  },
+  "risk": [
+   "CT",
+   "TT"
+  ]
+ },
+ "rs1799963": {
+  "gene": "F2",
+  "category": "Cardiovascular Risk",
+  "note": "Prothrombin G20210A; venous thrombosis",
+  "genotypes": {
+   "GG": "Normal",
+   "AG": "Carrier — elevated venous thrombosis risk",
+   "AA": "Homozygous — high thrombosis risk"
+  },
+  "risk": [
+   "AG",
+   "AA"
+  ]
+ },
+ "rs429358": {
+  "gene": "APOE",
+  "category": "Biological Age & Longevity",
+  "note": "APOE ε4 determinant — combined with rs7412 for ε genotype",
+  "genotypes": {
+   "TT": "No ε4 determinant here",
+   "CT": "One ε4 determinant",
+   "CC": "Two ε4 determinants"
+  }
+ },
+ "rs7412": {
+  "gene": "APOE",
+  "category": "Biological Age & Longevity",
+  "note": "APOE ε2 determinant — combined with rs429358 for ε genotype",
+  "genotypes": {
+   "CC": "No ε2 determinant here",
+   "CT": "One ε2 determinant",
+   "TT": "Two ε2 determinants"
+  }
+ }
+}

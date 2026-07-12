@@ -1,0 +1,17 @@
+# Personal data — never commit
+labs.db
+labs.db-journal
+inputs/*
+!inputs/.gitkeep
+
+# Generated outputs
+viewer.html
+master_protocol.md
+labs_export.md
+labs_export.txt
+labs_summary.md
+labs_summary.txt
+
+__pycache__/
+*.pyc
+.DS_Store
