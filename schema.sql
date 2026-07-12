@@ -1,4 +1,4 @@
--- health-tracker-template schema. labs.db is the source of truth.
+-- DNA and labs to protocol — schema. labs.db is the source of truth.
 -- Created by init_db.py; edited thereafter by Claude as you import data.
 
 -- ── Core ─────────────────────────────────────────────────────────────────────

@@ -1,6 +1,7 @@
-# Health Tracker
+# DNA and labs to protocol
 
-A local, private tracker for your lab results, DNA, and imaging reports.
+A local, private tracker that turns your lab results, DNA, and imaging reports into an
+interactive viewer and a personalized protocol.
 Drop your data in, and it builds a single self-contained `viewer.html` with charts,
 genetic-variant interpretations, per-category insights, and a consolidated protocol.
 
