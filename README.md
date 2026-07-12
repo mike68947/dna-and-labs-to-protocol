@@ -33,7 +33,9 @@ python3 viewer.py
   lines, a Longevity Dashboard of the mortality-moving markers, and a Screening Calendar.
 - **DNA variants** — your genotypes matched against a curated catalogue (pharmacogenomics,
   longevity, nutrition, fitness, cardiovascular/iron), with plain-language interpretations
-  and APOE ε genotype. Extend the catalogue in `data/known_variants.json`.
+  and APOE ε genotype. The catalogue is just the *interpreted highlights* — your genome file
+  stays fully queryable: `python3 lookup_variant.py rs1801133` looks up **any** variant on
+  demand. Extend the catalogue in `data/known_variants.json`.
 - **Insights & protocol** — Claude authors a per-category assessment and a master protocol
   grounded in *your* values and variants.
 - **LLM exports** — `export_for_llm.py` / `export_summary_for_llm.py` dump your data to one
@@ -50,6 +52,7 @@ here are small, population-dependent leans, not diagnoses. Confirm anything acti
 
 `schema.sql` (data model) · `init_db.py` (create+seed) · `viewer.py` (build the HTML) ·
 `import_dna.py` (DNA; VCF or 23andMe, matches by rsID or, for raw VCFs, chrom:pos with genome-
-build auto-detection) · `enrich_variants.py` (backfill variant coordinates from Ensembl) ·
+build auto-detection) · `lookup_variant.py` (query any variant from your genome on demand) ·
+`enrich_variants.py` (backfill variant coordinates from Ensembl) ·
 `inspect_import.py` (unit-error screen) · `seed_ref_ranges.py` · `screening_calendar.py` ·
 `export_*_for_llm.py` · `data/` (seed + variant catalogue) · `CLAUDE.md` (the agent playbook).

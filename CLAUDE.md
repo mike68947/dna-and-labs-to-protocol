@@ -87,6 +87,32 @@ Ensembl (needed only for the position fallback; rsID matching works without it).
 interpretations honest — common-variant effects are small and often population-specific.
 Re-run `import_dna.py` + `viewer.py`.
 
+## DNA analysis phase (query any variant, not just the catalogue)
+
+The catalogue is the *interpreted highlights*, not the limit. **The genome file in `inputs/`
+is the source of truth for every genotype — keep it there** (it's git-ignored). `import_dna.py`
+only writes the curated matches to `variants`; the rest of the genome stays in the file,
+queryable on demand. To analyze a topic that needs SNPs beyond the catalogue:
+
+1. **Query** any rsID(s) straight from the file — no re-import, no DB bloat:
+   ```bash
+   python3 lookup_variant.py rs1801133 rs662 rs1229984   # genotype + interpretation if catalogued
+   ```
+   It streams the file (gzip-ok, WGS-safe), auto-detects the build, and uses the chrom:pos
+   fallback for catalogued rsIDs in un-annotated VCFs. Read-only — it never writes the DB.
+2. **Interpret** the genotypes (your own knowledge, or fetch context from Ensembl/ClinVar).
+3. **Promote** anything worth surfacing into the viewer — insert an interpreted row:
+   ```sql
+   INSERT INTO variants (category_id, rsid, gene, relevance, genotype, zygosity)
+   VALUES (:cid, :rsid, :gene, :interpretation, :genotype, :zygosity);
+   ```
+   To make it a *reusable, auto-interpreted* highlight (so future imports label it), add the
+   SNP to `data/known_variants.json` and run `python3 enrich_variants.py`. Then `python3 viewer.py`.
+
+Out of scope (upgrade path): gene-region scanning and novel/rare-variant pathogenicity scoring
+(bcftools + snpEff + Ensembl VEP) — heavy and WGS-only; add it only if you need to discover
+variants that don't already have a known rsID.
+
 ## Importing imaging / reports
 
 Transcribe the finding into `documents` (`title, doc_date, doc_type, category_id, body`,

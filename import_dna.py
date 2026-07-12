@@ -23,6 +23,7 @@ enrich_variants.py once to add coordinates for any new catalogue entries.
 
 Extend coverage by adding entries to data/known_variants.json (see its _README).
 """
+import gzip
 import json
 import re
 import sqlite3
@@ -32,6 +33,17 @@ from pathlib import Path
 HERE = Path(__file__).parent
 DB = HERE / "labs.db"
 CATALOGUE = HERE / "data" / "known_variants.json"
+
+
+def read_genome_text(path):
+    """Read a genome file as text, transparently decompressing .gz.
+    ponytail: whole-file read is fine for consumer 23andMe/VCF files; a multi-GB
+    WGS VCF should be streamed instead — lookup_variant.py does that."""
+    path = Path(path)
+    if path.suffix == ".gz":
+        with gzip.open(path, "rt") as f:
+            return f.read()
+    return path.read_text()
 
 COMP = {"A": "T", "T": "A", "G": "C", "C": "G"}
 
@@ -114,6 +126,17 @@ def detect_format(text):
     return "23andme"
 
 
+def a23_call(cols):
+    """One 23andMe/AncestryDNA line (split on tab) -> (rsid, 'AG') or None."""
+    if len(cols) < 4:
+        return None
+    rsid = cols[0]
+    gt = (cols[3] if len(cols) == 4 else cols[3] + cols[4]).upper()
+    if rsid.startswith("rs") and len(gt) == 2 and set(gt) <= set("ACGT"):
+        return rsid, gt
+    return None
+
+
 def parse_23andme(text):
     """23andMe (rsid, chrom, pos, genotype) or AncestryDNA (rsid, chrom, pos,
     allele1, allele2). Returns {rsid: 'AG'} for clean 2-base ACGT calls."""
@@ -121,41 +144,44 @@ def parse_23andme(text):
     for line in text.splitlines():
         if line.startswith("#") or not line.strip():
             continue
-        f = line.split("\t")
-        if len(f) < 4:
-            continue
-        rsid = f[0]
-        gt = f[3] if len(f) == 4 else f[3] + f[4]
-        gt = gt.upper()
-        if rsid.startswith("rs") and len(gt) == 2 and set(gt) <= set("ACGT"):
-            out[rsid] = gt
+        call = a23_call(line.split("\t"))
+        if call:
+            out[call[0]] = call[1]
     return out
 
 
+def vcf_call(cols, pos_index=None):
+    """One VCF data line (split on tab) -> (rsid, 'CT') or None. The rsID comes
+    from the ID column; if that's blank ('.') and pos_index is given, it's
+    recovered from (chrom, pos). Only clean 2-allele ACGT calls are returned."""
+    if len(cols) < 10:
+        return None
+    chrom, pos, vid, ref, alt = cols[0], cols[1], cols[2], cols[3], cols[4].split(",")
+    rsid = vid if vid.startswith("rs") else None
+    if rsid is None and pos_index is not None and pos.isdigit():
+        rsid = pos_index.get((norm_chrom(chrom), int(pos)))
+    if not rsid:
+        return None
+    alleles = [ref] + alt
+    idx = cols[9].split(":")[0].replace("|", "/").split("/")
+    called = [alleles[int(i)] for i in idx
+              if i not in (".", "") and i.isdigit() and int(i) < len(alleles)]
+    gt = "".join(called)
+    if len(gt) == 2 and set(gt) <= set("ACGT"):
+        return rsid, gt
+    return None
+
+
 def parse_vcf(text, pos_index=None):
-    """Return {rsid: 'CT'} from a single-sample VCF. The rsID comes from the ID
-    column; if that's blank ('.') and pos_index is given, it's recovered from
-    (chrom, pos) — that's how un-annotated VCFs get matched."""
+    """Return {rsid: 'CT'} from a single-sample VCF (whole text in memory).
+    The chrom:pos fallback (via pos_index) is how un-annotated VCFs get matched."""
     out = {}
     for line in text.splitlines():
         if line.startswith("#") or not line.strip():
             continue
-        c = line.split("\t")
-        if len(c) < 10:
-            continue
-        chrom, pos, vid, ref, alt = c[0], c[1], c[2], c[3], c[4].split(",")
-        rsid = vid if vid.startswith("rs") else None
-        if rsid is None and pos_index is not None and pos.isdigit():
-            rsid = pos_index.get((norm_chrom(chrom), int(pos)))
-        if not rsid:
-            continue
-        alleles = [ref] + alt
-        idx = c[9].split(":")[0].replace("|", "/").split("/")
-        called = [alleles[int(i)] for i in idx
-                  if i not in (".", "") and i.isdigit() and int(i) < len(alleles)]
-        gt = "".join(called)
-        if len(gt) == 2 and set(gt) <= set("ACGT"):
-            out[rsid] = gt
+        call = vcf_call(line.split("\t"), pos_index)
+        if call:
+            out[call[0]] = call[1]
     return out
 
 
@@ -254,7 +280,7 @@ def main():
     if not args:
         sys.exit("usage: import_dna.py <genome.txt|.vcf> [--build 37|38]   |   --self-check")
 
-    text = Path(args[0]).read_text()
+    text = read_genome_text(args[0])
     catalogue = json.loads(CATALOGUE.read_text())
     fmt = detect_format(text)
     if fmt != "vcf":
@@ -279,6 +305,8 @@ def main():
     print(f"Format {fmt}, build GRCh{build}. Genotyped {len(genome)} rsIDs; "
           f"matched {len(rows)} catalogued variants.")
     print("Next: python3 viewer.py")
+    print("Tip: the whole genome stays queryable — `python3 lookup_variant.py <rsID ...>` "
+          "for any variant, catalogued or not.")
 
 
 def _self_check():

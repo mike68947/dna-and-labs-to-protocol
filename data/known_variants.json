@@ -1,5 +1,5 @@
 {
- "_README": "Curated SNP catalogue for import_dna.py. Add entries freely: key = rsID, value = {gene, category (a category name_en from schema.sql), note, genotypes{gt:interpretation}, risk[optional]}. The `chrom` and `pos`{37,38} fields are filled by enrich_variants.py (from Ensembl) so import_dna.py can match un-annotated VCFs by position on either genome build — run `python3 enrich_variants.py` after adding rsIDs. Common-variant effects are small and often population-specific — read as a lean, not a diagnosis.",
+ "_README": "Curated SNP catalogue for import_dna.py — the interpreted HIGHLIGHTS, not the limit: your genome file stays fully queryable via lookup_variant.py, and any variant can be promoted into the `variants` table. Add entries freely: key = rsID, value = {gene, category (a category name_en from schema.sql), note, genotypes{gt:interpretation}, risk[optional]}. The `chrom` and `pos`{37,38} fields are filled by enrich_variants.py (from Ensembl) so import_dna.py can match un-annotated VCFs by position on either genome build — run `python3 enrich_variants.py` after adding rsIDs. Common-variant effects are small and often population-specific — read as a lean, not a diagnosis.",
  "rs4244285": {
   "gene": "CYP2C19",
   "category": "Drug Metabolism (Pharmacogenomics)",
