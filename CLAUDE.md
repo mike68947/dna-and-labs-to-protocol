@@ -98,8 +98,11 @@ queryable on demand. To analyze a topic that needs SNPs beyond the catalogue:
    ```bash
    python3 lookup_variant.py rs1801133 rs662 rs1229984   # genotype + interpretation if catalogued
    ```
-   It streams the file (gzip-ok, WGS-safe), auto-detects the build, and uses the chrom:pos
-   fallback for catalogued rsIDs in un-annotated VCFs. Read-only — it never writes the DB.
+   It streams the file (gzip-ok, WGS-safe) and auto-detects the build. For an un-annotated VCF
+   it resolves any requested rsID's position from Ensembl on demand — so you're not limited to
+   catalogued rsIDs (`--offline` skips the network and uses catalogue coordinates only). A
+   resolved position with no record in the VCF is reported as homozygous reference. Read-only —
+   it never writes the DB.
 2. **Interpret** the genotypes (your own knowledge, or fetch context from Ensembl/ClinVar).
 3. **Promote** anything worth surfacing into the viewer — insert an interpreted row:
    ```sql
