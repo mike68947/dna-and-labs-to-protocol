@@ -23,7 +23,7 @@ python3 init_db.py --empty         # clean start for the user's OWN data: schema
 python3 viewer.py                  # regenerate viewer.html + master_protocol.md  (run after ANY db change)
 python3 import_dna.py <file>       # match a VCF or 23andMe raw file → variants table
 python3 export_for_llm.py          # full lab time-series → labs_export.md (feed to an LLM)
-python3 export_summary_for_llm.py  # condensed per-biomarker summary → labs_summary.md
+python3 export_for_llm.py --summary  # condensed per-biomarker summary → labs_summary.md
 python3 screening_calendar.py      # what preventive screening is due next (lab-backed rows self-update from test_results)
 open viewer.html
 ```

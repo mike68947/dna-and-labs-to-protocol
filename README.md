@@ -41,8 +41,8 @@ grounded in *your* results, and regenerates the viewer after each change.
   stays fully queryable, so the agent can look up **any** variant on demand and add it.
 - **Insights & protocol** — a per-category assessment and a consolidated master protocol,
   grounded in your values and variants (not generic advice).
-- **LLM exports** — one-file Markdown dumps of your data (`export_for_llm.py` /
-  `export_summary_for_llm.py`) to paste into any chat.
+- **LLM exports** — one-file Markdown dumps of your data (`export_for_llm.py`, or `--summary`
+  for a condensed version) to paste into any chat.
 
 ## Try it without your data
 
@@ -80,4 +80,4 @@ effects here are small, population-dependent leans, not diagnoses; confirm anyth
 for your own data) · `viewer.py` (build the HTML) · `import_dna.py` (DNA; VCF or 23andMe) ·
 `lookup_variant.py` (query any variant on demand) · `enrich_variants.py` (variant coordinates
 from Ensembl) · `inspect_import.py` (unit-error screen) · `seed_ref_ranges.py` ·
-`screening_calendar.py` · `export_*_for_llm.py` · `data/` (seed + variant catalogue).
+`screening_calendar.py` · `export_for_llm.py` · `data/` (seed + variant catalogue).
