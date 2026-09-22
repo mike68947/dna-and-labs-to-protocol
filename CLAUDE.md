@@ -25,17 +25,19 @@ python3 import_dna.py <file>       # match a VCF or 23andMe raw file → variant
 python3 export_for_llm.py          # full lab time-series → labs_export.md (feed to an LLM)
 python3 export_for_llm.py --summary  # condensed per-biomarker summary → labs_summary.md
 python3 screening_calendar.py      # what preventive screening is due next (lab-backed rows self-update from test_results)
+python3 check_all.py               # every --self-check + CONSISTENCY gate + stale/freshness reports (run after viewer.py)
 open viewer.html
 ```
 
-Self-checks (no writes): `python3 inspect_import.py --self-check`, `python3 import_dna.py
---self-check`, `python3 seed_ref_ranges.py --self-check`, `python3 screening_calendar.py
---self-check`.
+Every script has a `--self-check` (no writes); `python3 check_all.py` runs them all, then the
+**CONSISTENCY** gate (foreign-key orphans, future-dated results — exit 1) and the **REPORTS**
+(insights older than their labs, generated files older than `labs.db` — informational, never
+gate). Keep that split when adding a check: a gate that cries wolf gets ignored.
 
 **Typical flow for the user's own data:** `python3 init_db.py --empty` → they drop their lab,
 DNA, and imaging files in `inputs/` → import the labs (below), `python3 import_dna.py` their
 genome, transcribe the imaging into `documents` → author `category_insights` + the master
-protocol → `python3 viewer.py`.
+protocol → `python3 viewer.py` → `python3 check_all.py`.
 
 ## Data model (`labs.db`)
 
@@ -70,7 +72,11 @@ You extract the values — there's no format parser, that's the point.
 4. `INSERT OR IGNORE` into `test_results` — the schema's `UNIQUE(biomarker_id, date)` enforces one
    value per marker per date. (A `labs.db` created before that constraint existed:
    `CREATE UNIQUE INDEX IF NOT EXISTS idx_results_biomarker_date ON test_results(biomarker_id, date)`.)
-5. `python3 viewer.py`.
+5. `python3 viewer.py`, then `python3 check_all.py` (its stale-insight report is the list of
+   categories whose narrative now lags the new labs).
+
+Write each batch as a dated script, `imports/YYYY-MM-DD_<lab>.py` (git-ignored, kept on disk):
+ad-hoc inserts in a session leave no record of which report produced which rows.
 
 ## Importing DNA
 
@@ -163,12 +169,12 @@ items actually in use.
 
 ## Conventions
 
-- After ANY db change, run `python3 viewer.py`.
+- After ANY db change, run `python3 viewer.py`, then `python3 check_all.py`.
 - `test_results.value` is TEXT, not numeric.
 - Python standard library only, plus optional `bcftools` for fast VCF querying (auto-detected;
   a pure-Python scan runs when it's absent). Chart.js is vendored at `vendor/chart.umd.min.js`
   (pinned 4.5.1, MIT) and inlined — the viewer makes no network requests. Don't reintroduce a CDN
   tag (the page holds the whole dataset); to upgrade, re-download a pinned build into `vendor/`
   and re-run `viewer.py`.
-- **Privacy:** this is personal medical data. Keep `labs.db`, `inputs/`, and generated
+- **Privacy:** this is personal medical data. Keep `labs.db`, `inputs/`, `imports/`, and generated
   exports out of git (see `.gitignore`); share only the code and the synthetic seed.

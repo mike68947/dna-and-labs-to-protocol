@@ -80,4 +80,6 @@ effects here are small, population-dependent leans, not diagnoses; confirm anyth
 for your own data) · `viewer.py` (build the HTML) · `import_dna.py` (DNA; VCF or 23andMe) ·
 `lookup_variant.py` (query any variant on demand) · `enrich_variants.py` (variant coordinates
 from Ensembl) · `inspect_import.py` (unit-error screen) · `seed_ref_ranges.py` ·
-`screening_calendar.py` · `export_for_llm.py` · `data/` (seed + variant catalogue).
+`screening_calendar.py` · `export_for_llm.py` · `check_all.py` (every self-check + a consistency
+gate + stale-insight report) · `data/` (seed + variant catalogue) · `vendor/` (Chart.js, inlined) ·
+`AGENTS.md` (pointer for non-Claude agents).

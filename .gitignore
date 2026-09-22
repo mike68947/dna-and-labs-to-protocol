@@ -1,8 +1,11 @@
 # Personal data — never commit
-labs.db
-labs.db-journal
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
 inputs/*
 !inputs/.gitkeep
+imports/          # your dated import scripts (they contain your values)
 
 # Generated outputs
 viewer.html
@@ -15,3 +18,6 @@ labs_summary.txt
 __pycache__/
 *.pyc
 .DS_Store
+.env
+.venv/
+.claude/settings.local.json
