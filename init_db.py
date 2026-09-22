@@ -30,6 +30,7 @@ def main():
     DB.unlink(missing_ok=True)
 
     conn = sqlite3.connect(DB)
+    conn.execute("PRAGMA foreign_keys = ON")   # SQLite ignores the declared REFERENCES unless asked
     conn.executescript((HERE / "schema.sql").read_text())   # tables + the 16 categories
 
     applied = 0

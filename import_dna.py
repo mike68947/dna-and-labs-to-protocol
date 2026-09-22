@@ -392,6 +392,7 @@ def main():
         genome = query_vcf(src, pos_index, set(pos_index.values()))   # bcftools if available, else scan
 
     conn = sqlite3.connect(DB)
+    conn.execute("PRAGMA foreign_keys = ON")
     cat_ids = dict(conn.execute("SELECT name_en, id FROM categories").fetchall())
     rows = build_rows(genome, catalogue, cat_ids)
     conn.executemany(

@@ -170,6 +170,7 @@ def main():
         self_check()
         return
     conn = sqlite3.connect(DB)
+    conn.execute("PRAGMA foreign_keys = ON")
     if args.init:
         print(f"Seeded {init(conn)} new screening(s) into `screenings`.")
     if args.set:

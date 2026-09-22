@@ -22,7 +22,7 @@ LIMITATION: catches gross scale errors (≥~3–5× off, or a known factor). A u
 swap that lands in the same magnitude (e.g. a low-but-plausible value) still
 needs clinical judgment — cross-check against sibling markers and the ref range.
 """
-import json, re, sys, sqlite3, statistics as st
+import argparse, json, re, sys, sqlite3, statistics as st
 from pathlib import Path
 
 # known conversion ratios (>1) → human label, to name a suspected mismatch
@@ -118,14 +118,19 @@ def _self_check():
 
 
 def main():
-    if '--self-check' in sys.argv:
+    ap = argparse.ArgumentParser(description=__doc__,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument('rows', nargs='?', metavar='rows.json',
+                    help='JSON file of [[biomarker_id, date, value], ...] to screen')
+    ap.add_argument('--self-check', action='store_true', help='run self-tests and exit')
+    args = ap.parse_args()
+
+    if args.self_check:
         _self_check()
         return
-    args = [a for a in sys.argv[1:] if not a.startswith('-')]
-    if not args:
-        print("usage: inspect_import.py rows.json  (rows=[[bid,date,value],...])  |  --self-check")
-        return
-    rows = json.loads(Path(args[0]).read_text())
+    if not args.rows:
+        ap.error('rows.json is required (or pass --self-check)')   # used to print usage and exit 0
+    rows = json.loads(Path(args.rows).read_text())
     conn = sqlite3.connect(Path(__file__).parent / 'labs.db')
     sys.exit(1 if report(inspect(conn, rows)) else 0)
 

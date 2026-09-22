@@ -34,7 +34,8 @@ CREATE TABLE test_results (
     id            INTEGER PRIMARY KEY,
     biomarker_id  INTEGER NOT NULL REFERENCES biomarkers(id),
     date          DATE NOT NULL,
-    value         TEXT                 -- TEXT preserves qualifiers: "<10", ">750", "Negative"
+    value         TEXT,                -- TEXT preserves qualifiers: "<10", ">750", "Negative"
+    UNIQUE(biomarker_id, date)         -- one value per marker per date; import with INSERT OR IGNORE
 );
 
 -- ── Claude-authored layer ────────────────────────────────────────────────────

@@ -67,7 +67,9 @@ You extract the values — there's no format parser, that's the point.
    ```
    A value in a *plausible* magnitude can still be a unit swap the screen won't catch —
    cross-check sibling markers and the reference range by hand.
-4. `INSERT` into `test_results`, deduping on `(biomarker_id, date)`.
+4. `INSERT OR IGNORE` into `test_results` — the schema's `UNIQUE(biomarker_id, date)` enforces one
+   value per marker per date. (A `labs.db` created before that constraint existed:
+   `CREATE UNIQUE INDEX IF NOT EXISTS idx_results_biomarker_date ON test_results(biomarker_id, date)`.)
 5. `python3 viewer.py`.
 
 ## Importing DNA
