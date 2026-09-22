@@ -270,6 +270,7 @@ body { background: var(--bg); color: var(--text); font: 13px/1.4 'Inter', system
 .rsid-table .gt-cell.hom-alt { color: #e74c3c; }
 .rsid-table .gt-cell.het { color: #f39c12; }
 .rsid-table .gt-cell.hom-ref { color: #2ecc71; }
+.rsid-table .gt-cell.hom { color: #95a5a6; }   /* homozygous, effect allele unknown */
 .rsid-table .gt-cell.no-data { color: var(--border); }
 .no-insight { color: var(--muted); font-style: italic; }
 
@@ -333,6 +334,7 @@ body { background: var(--bg); color: var(--text); font: 13px/1.4 'Inter', system
 .z-hom { color: #e74c3c; font-weight: 500; }
 .z-het { color: #f39c12; font-weight: 500; }
 .z-ref { color: #2ecc71; font-weight: 500; }
+.z-unk { color: #95a5a6; }
 .conc-table td:nth-child(4) { font-weight: 600; text-align: center; white-space: nowrap; font-size: 10px; letter-spacing: 0.04em; }
 .v-confirms { color: #2ecc71; }
 .v-partial { color: #f39c12; }
@@ -735,10 +737,11 @@ function buildVariantBurden(rsids) {
   const byGene = {};
   found.forEach(r => {
     const g = r.gene || '(unknown)';
-    if (!byGene[g]) byGene[g] = {homAlt: 0, het: 0, homRef: 0};
+    if (!byGene[g]) byGene[g] = {homAlt: 0, het: 0, homRef: 0, hom: 0};
     if (r.zyg === 'hom-alt')      byGene[g].homAlt++;
     else if (r.zyg === 'het')     byGene[g].het++;
     else if (r.zyg === 'hom-ref') byGene[g].homRef++;
+    else if (r.zyg === 'hom')     byGene[g].hom++;   // effect allele unknown — counted, not scored
   });
   const genes = Object.keys(byGene).sort((a, b) => {
     const sa = byGene[a].homAlt * 2 + byGene[a].het;
@@ -749,11 +752,12 @@ function buildVariantBurden(rsids) {
           +  `<table class="burden-table"><tbody>`;
   genes.forEach(g => {
     const b = byGene[g];
-    const total = b.homAlt + b.het + b.homRef;
+    const total = b.homAlt + b.het + b.homRef + b.hom;
     const parts = [];
     if (b.homAlt)  parts.push(`<span class="z-hom">${b.homAlt} hom-alt</span>`);
     if (b.het)     parts.push(`<span class="z-het">${b.het} het</span>`);
     if (b.homRef)  parts.push(`<span class="z-ref">${b.homRef} hom-ref</span>`);
+    if (b.hom)     parts.push(`<span class="z-unk">${b.hom} hom</span>`);
     html += `<tr><td class="gene-cell">${escH(g)}</td>`
          +  `<td class="zyg-cell">${parts.join(' + ')}</td>`
          +  `<td class="count-cell">${total}</td></tr>`;

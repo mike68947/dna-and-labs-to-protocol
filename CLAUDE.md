@@ -78,7 +78,10 @@ python3 import_dna.py inputs/genome.vcf --build 38   # force build if the VCF he
 ```
 It matches the file against `data/known_variants.json` (a curated ~46-SNP catalogue spanning
 pharmacogenomics, longevity, nutrition, fitness, and cardiovascular/iron risk), tries both
-DNA strands, handles APOE's two-SNP ε genotype, and writes interpreted rows into `variants`.
+DNA strands (except palindromic A/T and C/G SNPs, which are taken as reported — a flip there is
+undetectable), handles APOE's two-SNP ε genotype, and writes interpreted rows into `variants`.
+Zygosity is `het` / `hom-alt` / `hom-ref` when the entry has a `risk` list, else plain `hom`
+(homozygous, effect allele unknown — don't read `hom` as "reference"). Non-PASS VCF calls are skipped.
 `example_genome.txt` is a synthetic file for testing.
 
 **VCF matching:** by rsID (the ID column) when present; when the ID column is blank (`.`, as in

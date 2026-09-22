@@ -15,7 +15,7 @@ data/known_variants.json, its gene + interpretation are shown too.
 For an un-annotated VCF (blank ID column), any requested rsID's position is
 resolved on demand from Ensembl (build-matched) and then looked up — so you are
 not limited to catalogued rsIDs. If a position resolves but the VCF has no record
-there, that's reported as homozygous reference. Use --offline to skip Ensembl
+there, that's reported as homozygous reference (true only if the VCF covers that site). Use --offline to skip Ensembl
 (catalogue coordinates only). 23andMe/array files carry rsIDs directly and never
 need the network.
 
@@ -111,7 +111,8 @@ def describe(rsid, gt, catalogue, fmt, resolved):
     """One report line for a requested rsID."""
     if gt is None:
         if fmt == "vcf" and rsid in resolved:
-            return f"{rsid:12} —      homozygous reference (position resolved, no variant call there)"
+            return (f"{rsid:12} —      no variant call at this position — homozygous reference IF your "
+                    "VCF covers this site (not for exome/targeted panels or low-depth regions)")
         if fmt == "vcf":
             return f"{rsid:12} —      not found (couldn't resolve its position — --offline, or rsID unknown to Ensembl)"
         return f"{rsid:12} —      not found (this SNP isn't on the array)"

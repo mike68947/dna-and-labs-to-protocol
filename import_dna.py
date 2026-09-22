@@ -10,7 +10,9 @@ the `variants` table (which the viewer renders per category).
 
 Orientation-safe: consumer chips and dbSNP don't always report on the same DNA
 strand, so every match is tried directly AND reverse-complemented before giving
-up. VCF sites are pulled with bcftools when it's installed (fast random access on
+up — except for palindromic (A/T, C/G) SNPs, where the flip of one homozygote IS
+the opposite homozygote, so a flip is undetectable and those are taken as
+reported (both file kinds are normally dbSNP-forward). VCF sites are pulled with bcftools when it's installed (fast random access on
 a bgzipped, tabix-indexed VCF) and by a pure-Python scan otherwise — so it runs
 with or without bcftools; no snpEff or reference genome is needed.
 
@@ -168,10 +170,14 @@ def parse_23andme(text):
     return out
 
 
+STATS = {"filtered": 0}   # ponytail: module counter for non-PASS catalogue sites; thread a stats object through if this grows
+
+
 def vcf_call(cols, pos_index=None):
     """One VCF data line (split on tab) -> (rsid, 'CT') or None. The rsID comes
     from the ID column; if that's blank ('.') and pos_index is given, it's
-    recovered from (chrom, pos). Only clean 2-allele ACGT calls are returned."""
+    recovered from (chrom, pos). Only clean 2-allele ACGT calls that passed the
+    caller's filters (FILTER is PASS or '.') are returned."""
     if len(cols) < 10:
         return None
     chrom, pos, vid, ref, alt = cols[0], cols[1], cols[2], cols[3], cols[4].split(",")
@@ -179,6 +185,9 @@ def vcf_call(cols, pos_index=None):
     if rsid is None and pos_index is not None and pos.isdigit():
         rsid = pos_index.get((norm_chrom(chrom), int(pos)))
     if not rsid:
+        return None
+    if cols[6] not in (".", "PASS", ""):      # a filtered call is not a confident genotype
+        STATS["filtered"] += 1
         return None
     alleles = [ref] + alt
     idx = cols[9].split(":")[0].replace("|", "/").split("/")
@@ -220,7 +229,7 @@ def _bcftools_regions(path, positions):
         except Exception:
             pass
     regions = ",".join(f"{ch}:{pos}-{pos}" for ch, pos in positions)
-    fmt = "%CHROM\t%POS\t%ID\t%REF\t%ALT\t.\t.\t.\tGT\t[%GT]\n"   # 10 cols → the vcf_call layout
+    fmt = "%CHROM\t%POS\t%ID\t%REF\t%ALT\t.\t%FILTER\t.\tGT\t[%GT]\n"   # 10 cols → the vcf_call layout
     try:
         out = subprocess.run(["bcftools", "query", "-r", regions, "-f", fmt, p],
                              check=True, capture_output=True, text=True, timeout=1200).stdout
@@ -257,11 +266,21 @@ def query_vcf(path, pos_index, wanted):
 
 
 # ── Matching ─────────────────────────────────────────────────────────────────
+def palindromic(genotypes):
+    """True when a SNP's alleles are A/T or C/G. Reverse-complementing one homozygote of
+    such a SNP yields the OTHER homozygote, so a strand flip is undetectable and an rc()
+    retry would silently return the inverted interpretation. Unknown alleles → False."""
+    alleles = set("".join(genotypes).upper())
+    return bool(alleles) and (alleles <= {"A", "T"} or alleles <= {"C", "G"})
+
+
 def match(user_gt, genotypes):
-    """genotypes: {catalogue_gt: interpretation}. Try the user genotype directly,
-    then reverse-complemented. Returns interpretation or None."""
+    """genotypes: {catalogue_gt: interpretation}. Try the user genotype directly, then
+    reverse-complemented — except for palindromic SNPs (see palindromic()), which are
+    taken as reported. Returns interpretation or None."""
     table = {canon(k): v for k, v in genotypes.items()}
-    for g in (user_gt, rc(user_gt)):
+    tries = (user_gt,) if palindromic(genotypes) else (user_gt, rc(user_gt))
+    for g in tries:
         hit = table.get(canon(g))
         if hit is not None:
             return hit
@@ -269,12 +288,18 @@ def match(user_gt, genotypes):
 
 
 def zygosity(user_gt, rec):
-    """het if the two alleles differ; else hom-alt when the (canonical) genotype
-    is flagged in the record's `risk` list, otherwise hom-ref."""
+    """het if the two alleles differ. For a homozygote: 'hom-alt' / 'hom-ref' when the
+    record carries a `risk` list (is this the flagged genotype or not); plain 'hom' when
+    it doesn't — the effect allele is then unknown, and calling it 'hom-ref' painted
+    homozygous functional genotypes (FUT2 AA non-secretor) green in the viewer."""
     if user_gt[0] != user_gt[1]:
         return "het"
-    risk = {canon(r) for r in rec.get("risk", [])}
-    risk |= {canon(rc(r)) for r in rec.get("risk", [])}   # strand-agnostic
+    risk_list = rec.get("risk") or []
+    if not risk_list:
+        return "hom"
+    risk = {canon(r) for r in risk_list}
+    if not palindromic(rec.get("genotypes", {})):
+        risk |= {canon(rc(r)) for r in risk_list}   # strand-agnostic; unsafe for palindromic SNPs
     return "hom-alt" if canon(user_gt) in risk else "hom-ref"
 
 
@@ -376,6 +401,12 @@ def main():
     conn.commit()
     conn.close()
     print(f"Format {fmt}, build GRCh{build}. Matched {len(rows)} catalogued variants.")
+    n_pal = sum(1 for r in rows if palindromic(catalogue.get(r[1], {}).get("genotypes", {})))
+    if n_pal:
+        print(f"  {n_pal} palindromic (A/T or C/G) SNP(s) taken as reported — strand can't be "
+              "verified for these; consumer files and VCFs are normally dbSNP-forward.")
+    if STATS["filtered"]:
+        print(f"  {STATS['filtered']} catalogue site(s) skipped: VCF FILTER not PASS.")
     print("Next: python3 viewer.py")
     print("Tip: the whole genome stays queryable — `python3 lookup_variant.py <rsID ...>` "
           "for any variant, catalogued or not.")
@@ -388,6 +419,8 @@ def _self_check():
                       "rs1801133\t1\t11856378\tC\tT\nrsX\t1\t1\t--\n")
     assert g == {"rs4988235": "TT", "rs1801133": "CT"}, g
     assert parse_vcf("#CHROM\tPOS\nx\t1\trs1\tC\tT\t.\t.\t.\tGT\t0/1\n") == {"rs1": "CT"}
+    assert parse_vcf("x\t1\trs1\tC\tT\t.\tPASS\t.\tGT\t0/1\n") == {"rs1": "CT"}
+    assert parse_vcf("x\t1\trs1\tC\tT\t.\tLowQual\t.\tGT\t0/1\n") == {}     # filtered call skipped
     assert detect_format("##fileformat=VCFv4.2\n") == "vcf"
     assert detect_format("rs1\t1\t2\tAA\n") == "23andme"
     # genome-build detection: contig-length fingerprint, reference string, or unknown
@@ -401,15 +434,24 @@ def _self_check():
     assert parse_vcf("1\t11796321\t.\tG\tA\t.\t.\t.\tGT\t0/1\n", idx38) == {"rs9": "GA"}
     assert parse_vcf("chr1\t11796321\t.\tG\tA\t.\t.\t.\tGT\t1|1\n", idx38) == {"rs9": "AA"}
     assert parse_vcf("1\t11856378\t.\tG\tA\t.\t.\t.\tGT\t0/1\n", idx38) == {}   # GRCh37 pos, wrong build
-    # direct match, and strand-flip match (user 'AA' vs catalogue listing 'TT')
+    # direct match, and strand-flip match (user 'AG' vs catalogue listing 'CT')
     genos = {"CC": "non-persistent", "CT": "persistent", "TT": "persistent"}
     assert match("TT", genos) == "persistent"
-    assert match("AA", {"TT": "flip-hit"}) == "flip-hit"
+    assert match("AG", {"CT": "flip-hit", "TT": "x"}) == "flip-hit"
     assert match("GG", {"AA": "x"}) is None
-    # zygosity: het, hom flagged as risk -> hom-alt, hom not flagged -> hom-ref
+    # palindromic (A/T, C/G) SNPs: no strand-flip retry — the flip of one homozygote is the other
+    pal = {"AA": "two risk alleles", "AT": "one", "TT": "lower-risk"}
+    assert palindromic(pal) and palindromic({"CC": 1, "GG": 1}) and not palindromic(genos) and not palindromic({})
+    assert match("TT", pal) == "lower-risk"
+    assert match("TT", {"AA": "x", "AT": "y"}) is None          # used to flip to AA and return "x"
+    # zygosity: het; hom flagged as risk -> hom-alt (strand-agnostic for non-palindromic SNPs);
+    # hom not flagged -> hom-ref; no risk list -> plain 'hom' (effect allele unknown)
     assert zygosity("CT", {}) == "het"
     assert zygosity("CC", {"risk": ["CC"]}) == "hom-alt"
     assert zygosity("TT", {"risk": ["CC"]}) == "hom-ref"
+    assert zygosity("GG", {"risk": ["CC"], "genotypes": genos}) == "hom-alt"   # flipped risk genotype
+    assert zygosity("TT", {}) == "hom"
+    assert zygosity("TT", {"risk": ["AA"], "genotypes": pal}) == "hom-ref"     # palindromic: TT is not flipped AA
     # APOE haplotypes
     assert apoe_call({"rs429358": "TT", "rs7412": "CC"})["genotype"] == "ε3/ε3"
     assert apoe_call({"rs429358": "CT", "rs7412": "CC"})["genotype"] == "ε3/ε4"

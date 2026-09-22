@@ -60,7 +60,8 @@ CREATE TABLE variants (               -- populated by import_dna.py from your DN
     gene         TEXT,
     relevance    TEXT,                 -- interpretation string (viewer renders this)
     genotype     TEXT,                 -- e.g. "CT" or "ε3/ε4"
-    zygosity     TEXT,                 -- 'het' | 'hom-alt' | 'hom-ref'
+    zygosity     TEXT,                 -- 'het' | 'hom-alt' | 'hom-ref' | 'hom' (homozygous, effect allele
+                                       -- unknown: the catalogue entry has no `risk` list)
     UNIQUE(category_id, rsid)
 );
 
