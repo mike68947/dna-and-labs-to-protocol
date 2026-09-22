@@ -12,7 +12,8 @@ with charts, genetic variants, per-category insights, and a master protocol.
 **`labs.db` is the source of truth.** It's git-ignored and rebuilt by `init_db.py`. All
 edits happen against `labs.db` directly (or against `data/seed.json` if you want them in
 the seeded example). Python standard library only, plus optional `bcftools` for fast VCF
-queries (pure-Python fallback); Chart.js loads from a CDN in the generated HTML.
+queries (pure-Python fallback); Chart.js is vendored (`vendor/chart.umd.min.js`, pinned 4.5.1)
+and inlined into the generated HTML — the viewer makes no network requests.
 
 ## Commands
 
@@ -160,6 +161,9 @@ items actually in use.
 - After ANY db change, run `python3 viewer.py`.
 - `test_results.value` is TEXT, not numeric.
 - Python standard library only, plus optional `bcftools` for fast VCF querying (auto-detected;
-  a pure-Python scan runs when it's absent). Chart.js loads from a CDN in the generated HTML.
+  a pure-Python scan runs when it's absent). Chart.js is vendored at `vendor/chart.umd.min.js`
+  (pinned 4.5.1, MIT) and inlined — the viewer makes no network requests. Don't reintroduce a CDN
+  tag (the page holds the whole dataset); to upgrade, re-download a pinned build into `vendor/`
+  and re-run `viewer.py`.
 - **Privacy:** this is personal medical data. Keep `labs.db`, `inputs/`, and generated
   exports out of git (see `.gitignore`); share only the code and the synthetic seed.

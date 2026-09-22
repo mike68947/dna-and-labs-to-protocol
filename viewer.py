@@ -1,14 +1,25 @@
 """
 Generate viewer.html — a standalone lab results viewer from labs.db.
 """
-import sqlite3
+import argparse
 import json
+import os
+import sqlite3
 import sys
 from pathlib import Path
+
+os.umask(0o077)  # viewer.html / master_protocol.md hold your whole dataset — keep them owner-only
 
 DB = Path('labs.db')
 OUT = Path('viewer.html')
 PROTOCOL_OUT = Path('master_protocol.md')
+
+# Chart.js is VENDORED and inlined, not pulled from a CDN. The page embeds your complete lab,
+# genetic, protocol and screening dataset, so a <script src> pointing at a floating
+# `chart.js@4` on a third-party CDN meant any tampered response could read all of it.
+# Inlining also makes the viewer genuinely self-contained: no network at view time.
+# Upgrade deliberately: re-download a pinned build into vendor/ and re-run.
+CHART_JS = Path(__file__).resolve().parent / 'vendor' / 'chart.umd.min.js'
 
 DOMAIN_HEADINGS = [
     ('supplements',      '═══ SUPPLEMENTS ═══'),
@@ -85,7 +96,7 @@ def load_data():
         row = cur.execute('SELECT protocol FROM unified_protocol ORDER BY id DESC LIMIT 1').fetchone()
         if row:
             unified = row[0]
-    except Exception:
+    except sqlite3.OperationalError:   # table missing on a fresh --empty db
         pass
 
     # Screening calendar (table may not exist if screening_calendar.py --init hasn't run)
@@ -95,7 +106,7 @@ def load_data():
             'SELECT name, domain, cadence_months, last_done, last_result, priority, rationale '
             'FROM screenings ORDER BY name'
         ).fetchall()
-    except Exception:
+    except sqlite3.OperationalError:   # screenings table not created yet
         pass
 
     con.close()
@@ -452,7 +463,7 @@ td.col-date:not(.has-val) { color: var(--border); }
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script>__CHARTJS__</script>
 <script>
 const DATA = __DATA__;
 
@@ -1185,18 +1196,77 @@ renderSidebar();
 """
 
 
+def escape_for_script(s):
+    """Make a JSON payload safe to inline inside a <script> element.
+
+    The blob is substituted into `<script>__DATA__</script>`, so a `</script` anywhere in the
+    data would close the element early and turn the rest of the payload into markup. `<` is
+    routine in lab data (`ANC <1.5`, `target <8`), so `</script` is one authored sentence away.
+    `\\u003c` is a valid JSON string escape decoding back to `<`, so the parsed data is
+    identical; `<` only ever occurs inside JSON string values here (structural JSON has none),
+    which makes the blanket replace safe. U+2028/U+2029 are legal JSON but have historically
+    broken JS parsers, and ensure_ascii=False passes them through raw.
+    """
+    return (s.replace('<', '\\u003c')
+             .replace('\u2028', '\\u2028')
+             .replace('\u2029', '\\u2029'))
+
+
+def load_chart_js():
+    """The vendored Chart.js source, or a loud exit — a missing asset would otherwise ship a
+    viewer whose charts are silently dead until you click a biomarker."""
+    if not CHART_JS.exists():
+        sys.exit(f'missing {CHART_JS} — re-download a pinned Chart.js build there (see the CHART_JS note)')
+    src = CHART_JS.read_text(encoding='utf-8')
+    if '</script' in src.lower():
+        sys.exit(f"{CHART_JS} contains '</script' — inlining it would break the page")
+    return src
+
+
+def render(data, chart_js):
+    json_str = escape_for_script(json.dumps(data, ensure_ascii=False, separators=(',', ':')))
+    return HTML_TEMPLATE.replace('__DATA__', json_str).replace('__CHARTJS__', chart_js)
+
+
+def self_check():
+    hostile = {'note': 'end tag </script> then <script>alert(1)</script>',
+               'sep': 'a\u2028b\u2029c', 'lab': 'ANC <1.5', 'ok': 'plain'}
+    raw = json.dumps(hostile, ensure_ascii=False, separators=(',', ':'))
+    esc = escape_for_script(raw)
+    assert '<' not in esc and '\u2028' not in esc and '\u2029' not in esc, esc
+    assert json.loads(esc) == hostile, json.loads(esc)          # byte-identical after parsing
+    assert escape_for_script('no specials') == 'no specials'
+    # the rendered page has exactly the template's own script tags — the payload formed none
+    n_tags = HTML_TEMPLATE.count('<script')
+    assert n_tags == 2, n_tags
+    page = render(hostile, '/* chart.js stub */')
+    assert page.count('<script') == n_tags and page.count('</script') == n_tags, 'payload injected a tag'
+    assert 'cdn.jsdelivr' not in HTML_TEMPLATE
+    assert load_chart_js().startswith('/*!')                      # vendored asset present, no </script
+    # compose_protocol: non-null domain columns win, all-empty falls back to None
+    assert compose_protocol(None, None, None, None, None) is None
+    assert '═══ DIET ═══' in compose_protocol(None, 'eat well', None, None, None)
+    assert compose_protocol('  ', '', None, None, None) is None
+    print('self-check OK')
+
+
 def main():
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument('--self-check', action='store_true', help='run self-tests and exit')
+    args = ap.parse_args()
+    if args.self_check:
+        self_check()
+        return
     if not DB.exists():
         print(f'Error: {DB} not found. Run: python3 init_db.py')
         sys.exit(1)
+    chart_js = load_chart_js()
 
     print('Loading data...')
     categories, biomarkers, bm_cats, results, insights, rsids, unified, screenings = load_data()
     data = build_json(categories, biomarkers, bm_cats, results, insights, rsids, unified, screenings)
 
-    json_str = json.dumps(data, ensure_ascii=False, separators=(',', ':'))
-    html = HTML_TEMPLATE.replace('__DATA__', json_str)
-    OUT.write_text(html, encoding='utf-8')
+    OUT.write_text(render(data, chart_js), encoding='utf-8')
 
     # Export unified protocol to markdown
     if unified:

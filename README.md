@@ -63,6 +63,8 @@ through the agent — there's no parser to run by hand.)
 
 Python's standard library, plus optional [`bcftools`](https://samtools.github.io/bcftools/) for
 fast VCF queries (a pure-Python scan is used when it's absent). No build step, no services.
+Chart.js is vendored and inlined, so the generated viewer works fully offline and makes no
+network requests.
 
 ## Privacy
 
