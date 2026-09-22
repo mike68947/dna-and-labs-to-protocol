@@ -302,6 +302,7 @@ body { background: var(--bg); color: var(--text); font: 13px/1.4 'Inter', system
 .rng-dot.in   { background: #2ecc71; }
 .rng-dot.high { background: #f39c12; }
 .rng-dot.low  { background: #5b8dee; }
+.rng-dot.unknown { background: #95a5a6; }
 
 /* ── Combined Assessment sections ── */
 .assess-section { margin-bottom: 28px; max-width: 1000px; }
@@ -495,15 +496,10 @@ function personalBand(pr, age) {
   }
   return null;
 }
-// Status of a value vs a personalized band: 'high' | 'low' | 'in' | '' (unknown).
+// Status of a value vs a personalized band: 'high' | 'low' | 'in' | 'unknown' (censored
+// bound, undecidable) | '' (no band / non-numeric).
 function bandStatus(val, band) {
-  if (!band) return '';
-  const v = parseNum(val);
-  if (isNaN(v)) return '';
-  const [lo, hi] = band;
-  if (hi != null && v > hi) return 'high';
-  if (lo != null && v < lo) return 'low';
-  return 'in';
+  return band ? boundStatus(val, band[0], band[1]) : '';
 }
 function fmtBound(n) {
   if (Number.isInteger(n)) return String(n);
@@ -690,8 +686,8 @@ function buildLabSnapshot(bms) {
     const prior  = points.length > 1 ? points[points.length - 2] : null;
     let trend = '', trendCls = '';
     if (prior) {
-      const lv = parseFloat(latest.value);
-      const pv = parseFloat(prior.value);
+      const lv = parseNum(latest.value);
+      const pv = parseNum(prior.value);
       if (!isNaN(lv) && !isNaN(pv) && pv !== 0) {
         const ratio = lv / pv;
         if (ratio > 1.05)      { trend = '↑'; trendCls = 'up'; }
@@ -831,14 +827,35 @@ function showUnified() {
 // real least-squares trend — not the ±5% last-vs-prior arrow used elsewhere.
 
 function parseNum(v) {
-  // Strip qualifiers like "<10.00", ">750", "≤2.0" before parsing.
+  // Strip qualifiers like "<10.00", ">750", "≤2.0" before parsing, and tolerate comma
+  // decimals ("0,215") — parseFloat reads those as 0. NB: for a censored value the result
+  // is its BOUND, not a measurement — see qualOf().
   if (v === null || v === undefined) return NaN;
-  return parseFloat(String(v).replace(/^[<>≤≥~]+/, ''));
+  return parseFloat(String(v).replace(/^[<>≤≥~]+/, '').replace(',', '.'));
+}
+function qualOf(v) {
+  // '<' for a below-detection value ("<10", "≤2.0"), '>' for above-range (">750", "≥"), '' otherwise.
+  const m = String(v ?? '').match(/^([<>≤≥])/);
+  return m ? (m[1] === '≤' ? '<' : m[1] === '≥' ? '>' : m[1]) : '';
+}
+function boundStatus(raw, lo, hi) {
+  // Value vs a [lo, hi] band → 'high' | 'low' | 'in' | 'unknown' | '' (non-numeric).
+  // A censored value is a bound, not a measurement: "<x" with x ≤ lo is certainly low,
+  // "<x" with x above hi is undecidable (any value under x); mirror for ">x".
+  const v = parseNum(raw), q = qualOf(raw);
+  if (isNaN(v)) return '';
+  if (q === '<') return (lo != null && v <= lo) ? 'low' : (hi != null && v > hi) ? 'unknown' : 'in';
+  if (q === '>') return (hi != null && v >= hi) ? 'high' : (lo != null && v < lo) ? 'unknown' : 'in';
+  if (hi != null && v > hi) return 'high';
+  if (lo != null && v < lo) return 'low';
+  return 'in';
 }
 
 function leastSqSlopePerYear(points) {
   // points: [{date:'YYYY-MM-DD', value}]. Returns slope in units/year, or null.
+  // Censored values ("<10") are bounds, not measurements — they are left out of the fit.
   const pts = points
+    .filter(p => !qualOf(p.value))
     .map(p => ({t: Date.parse(p.date), y: parseNum(p.value)}))
     .filter(p => !isNaN(p.t) && !isNaN(p.y));
   if (pts.length < 2) return null;
@@ -876,11 +893,10 @@ function showLongevity() {
     DATA.dates.forEach((d, i) => { if (resMap[i] !== undefined) points.push({date: d, value: resMap[i]}); });
     if (!points.length) return;
     const latest = points[points.length - 1];
-    const val = parseNum(latest.value);
-    // Status vs optimal band.
-    let status = 'in', statusTxt = 'optimal';
-    if (b.oh != null && !isNaN(val) && val > b.oh) { status = 'high'; statusTxt = 'above optimal'; }
-    else if (b.ol != null && !isNaN(val) && val < b.ol) { status = 'low'; statusTxt = 'below optimal'; }
+    // Status vs optimal band (bound-aware: a censored "<x" is not scored as x).
+    const status = boundStatus(latest.value, b.ol, b.oh) || 'in';   // non-numeric: no claim
+    const statusTxt = {high: 'above optimal', low: 'below optimal', in: 'optimal',
+                       unknown: `censored ${escH(String(latest.value))} — band status undecidable`}[status];
     const slope = leastSqSlopePerYear(points);
     // Direction relative to optimal: is the trend moving toward the band?
     let arrow = '→', moving = '';
@@ -894,7 +910,7 @@ function showLongevity() {
                band, status, statusTxt, slope, arrow, moving, n: points.length});
   });
   // Out-of-optimal first, then by name.
-  const order = {high: 0, low: 0, in: 1};
+  const order = {high: 0, low: 0, unknown: 0, in: 1};
   rows.sort((a, b) => (order[a.status] - order[b.status]) || a.name.localeCompare(b.name));
 
   const off = rows.filter(r => r.status !== 'in').length;
@@ -904,7 +920,7 @@ function showLongevity() {
     + `Bands are longevity-optimal (tighter than lab reference). Trend = least-squares slope per year.</p>`
     + `<table class="snap-table"><thead><tr>`
     + `<th>Marker</th><th>Latest</th><th>Optimal band</th><th>Status</th><th>Trend/yr</th></tr></thead><tbody>`;
-  const col = {high: '#f39c12', low: '#5b8dee', in: '#2ecc71'};
+  const col = {high: '#f39c12', low: '#5b8dee', in: '#2ecc71', unknown: '#95a5a6'};
   rows.forEach(r => {
     const unitHtml = r.unit ? `<span class="snap-unit">${escH(r.unit)}</span>` : '';
     let trendTxt = '—';
@@ -1113,7 +1129,7 @@ function openModal(bmId) {
     <div class="meta">${[b.spec, b.unit].filter(Boolean).join(' · ')}</div>`;
 
   // Chart — only numeric points
-  const numPts = points.filter(p => !isNaN(parseFloat(p.value)));
+  const numPts = points.filter(p => !isNaN(parseNum(p.value)));
   if (chartInst) { chartInst.destroy(); chartInst = null; }
   if (numPts.length >= 2) {
     const ctx = document.getElementById('chart-canvas').getContext('2d');
@@ -1129,10 +1145,14 @@ function openModal(bmId) {
     };
     const datasets = [{
           label: 'value',
-          data: numPts.map(p => parseFloat(p.value)),
+          data: numPts.map(p => parseNum(p.value)),
+          rawLabels: numPts.map(p => String(p.value)),     // tooltip shows "<10", not 10
           borderColor: '#5b8dee',
           backgroundColor: 'rgba(91,141,238,.12)',
-          pointBackgroundColor: '#5b8dee',
+          // censored ("<10" / ">750") points are plotted at their bound and drawn hollow
+          pointBackgroundColor: numPts.map(p => qualOf(p.value) ? 'rgba(0,0,0,0)' : '#5b8dee'),
+          pointBorderColor: '#5b8dee',
+          pointBorderWidth: numPts.map(p => qualOf(p.value) ? 2 : 1),
           pointRadius: 4,
           tension: 0.3,
           fill: true,
@@ -1155,7 +1175,7 @@ function openModal(bmId) {
       options: {
         responsive: true, maintainAspectRatio: false,
         plugins: { legend: { display: datasets.length > 1, labels: { color: '#8890a8', font: { size: 10 }, boxWidth: 18 } }, tooltip: {
-          callbacks: { label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y}${b.unit ? ' ' + b.unit : ''}` }
+          callbacks: { label: ctx => `${ctx.dataset.label}: ${ctx.dataset.rawLabels ? ctx.dataset.rawLabels[ctx.dataIndex] : ctx.parsed.y}${b.unit ? ' ' + b.unit : ''}` }
         }},
         scales: {
           x: { ticks: { color: '#8890a8', font: { size: 10 } }, grid: { color: '#2d3045' } },
@@ -1247,6 +1267,12 @@ def self_check():
     assert compose_protocol(None, None, None, None, None) is None
     assert '═══ DIET ═══' in compose_protocol(None, 'eat well', None, None, None)
     assert compose_protocol('  ', '', None, None, None) is None
+    # censored values: a bound is not a measurement — status is bound-aware, the fit skips them,
+    # the chart keeps them (hollow) and the tooltip shows the raw string; no raw parseFloat on values
+    for frag in ('function qualOf(v)', 'function boundStatus(raw, lo, hi)', '.filter(p => !qualOf(p.value))',
+                 'band status undecidable', 'rawLabels: numPts.map(p => String(p.value))', "replace(',', '.')"):
+        assert frag in HTML_TEMPLATE, frag
+    assert 'parseFloat(latest.value)' not in HTML_TEMPLATE and 'parseFloat(p.value)' not in HTML_TEMPLATE
     print('self-check OK')
 
 
