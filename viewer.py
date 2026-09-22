@@ -8,6 +8,8 @@ import sqlite3
 import sys
 from pathlib import Path
 
+import screening_calendar   # DERIVED_FROM / derived_dates: lab-backed screening dates
+
 os.umask(0o077)  # viewer.html / master_protocol.md hold your whole dataset — keep them owner-only
 
 DB = Path('labs.db')
@@ -106,6 +108,9 @@ def load_data():
             'SELECT name, domain, cadence_months, last_done, last_result, priority, rationale '
             'FROM screenings ORDER BY name'
         ).fetchall()
+        derived = screening_calendar.derived_dates(con)   # same dates the CLI report shows
+        screenings = [(n, d, c, derived[n] if n in derived else ld, lr, p, r)
+                      for n, d, c, ld, lr, p, r in screenings]
     except sqlite3.OperationalError:   # screenings table not created yet
         pass
 
