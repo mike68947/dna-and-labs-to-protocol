@@ -71,8 +71,13 @@ It matches the file against `data/known_variants.json` (a curated ~46-SNP catalo
 pharmacogenomics, longevity, nutrition, fitness, and cardiovascular/iron risk), tries both
 DNA strands (except palindromic A/T and C/G SNPs, which are taken as reported — a flip there is
 undetectable), handles APOE's two-SNP ε genotype, and writes interpreted rows into `variants`.
-Zygosity is `het` / `hom-alt` / `hom-ref` when the entry has a `risk` list, else plain `hom`
-(homozygous, effect allele unknown — don't read `hom` as "reference"). Non-PASS VCF calls are skipped.
+**Read direction from `effect_allele` / `effect_copies`, never from the zygosity word.**
+`import_dna.py` fills them from the entry's `risk` list (its homozygote names the effect allele);
+with no `risk` list (or an `effect` + `source` pair) they stay NULL — direction unknown.
+`zygosity` is relative to that risk genotype, NOT to the reference genome: `het` / `hom-alt`
+(the flagged homozygote) / `hom-ref` (another listed homozygote) / `hom` (direction unknown) /
+`hemi` (one copy, e.g. a male X call). Non-PASS VCF calls are skipped, and a site absent from
+the file gets no row: absence is not a genotype.
 `example_genome.txt` is a synthetic file for testing.
 
 **VCF matching:** by rsID (the ID column) when present; when the ID column is blank (`.`, as in
@@ -108,9 +113,16 @@ queryable on demand. To analyze a topic that needs SNPs beyond the catalogue:
 2. **Interpret** the genotypes (your own knowledge, or fetch context from Ensembl/ClinVar).
 3. **Promote** anything worth surfacing into the viewer — insert an interpreted row:
    ```sql
-   INSERT INTO variants (category_id, rsid, gene, relevance, genotype, zygosity)
-   VALUES (:cid, :rsid, :gene, :interpretation, :genotype, :zygosity);
+   INSERT INTO variants (category_id, rsid, gene, relevance, genotype, zygosity,
+                         effect_allele, effect_copies)
+   VALUES (:cid, :rsid, :gene, :interpretation, :genotype, :zygosity, :allele, :copies);
    ```
+   Same conventions as the catalogue: `zygosity` relative to the risk genotype, and
+   `effect_allele` / `effect_copies` only from a source that names the allele (GWAS Catalog,
+   a PubMed abstract) — otherwise NULL. A reference genome often carries the minor or the
+   effect allele, so "hom-ref"/"hom-alt" from a VCF says nothing about risk; and on a
+   minus-strand gene the paper's allele is the complement of the genome call.
+   `check_all.py` re-reads every promoted row from the genome file.
    To make it a *reusable, auto-interpreted* highlight (so future imports label it), add the
    SNP to `data/known_variants.json` and run `python3 enrich_variants.py`. Then `python3 viewer.py`.
 

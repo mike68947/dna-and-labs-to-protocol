@@ -50,6 +50,29 @@ INSIGHT_COLS = ["category_id", "insight", "insight_dna", "supplements", "diet",
                 "activity", "lifestyle", "checkup_schedule", "concordance"]
 
 
+def migrate(conn):
+    """Bring a labs.db made by an older version up to schema.sql: add the tables, indexes and
+    (nullable) columns it lacks. Idempotent, never drops anything. → list of changes.
+    # ponytail: additive only; a renamed or retyped column needs a hand-written step."""
+    ref = sqlite3.connect(":memory:")
+    ref.executescript((HERE / "schema.sql").read_text())
+    have = {n for (n,) in conn.execute("SELECT name FROM sqlite_master")}
+    done = []
+    for typ, name, sql in ref.execute("SELECT type, name, sql FROM sqlite_master "
+                                      "WHERE sql IS NOT NULL ORDER BY type = 'index', rowid"):
+        if name not in have:
+            conn.execute(sql)
+            done.append(f"+{typ} {name}")
+        elif typ == "table":
+            cols = {r[1] for r in conn.execute(f"PRAGMA table_info({name})")}
+            for _, col, ctype, *_ in ref.execute(f"PRAGMA table_info({name})"):
+                if col not in cols:
+                    conn.execute(f"ALTER TABLE {name} ADD COLUMN {col} {ctype}")
+                    done.append(f"+{name}.{col}")
+    ref.close()
+    return done
+
+
 def main():
     if "--self-check" in sys.argv:
         return _self_check()
@@ -95,11 +118,18 @@ def main():
                 f"VALUES ({','.join('?' * len(INSIGHT_COLS))})",
                 [ins.get(c) for c in INSIGHT_COLS])
 
+        import import_dna                         # the demo's effect columns come from the catalogue, as a real import's do
+        catalogue = json.loads(import_dna.CATALOGUE.read_text())
+        rows = []
+        for v in seed.get("variants", []):
+            gt = v.get("genotype") or ""
+            ea, ec = (("ε4", gt.count("ε4")) if v["rsid"] == "rs429358"
+                      else import_dna.effect(gt, catalogue.get(v["rsid"], {})))
+            rows.append((v["category_id"], v["rsid"], v.get("gene"), v.get("relevance"), gt,
+                         v.get("zygosity"), ea, ec))
         conn.executemany(
-            "INSERT INTO variants (category_id, rsid, gene, relevance, genotype, zygosity) "
-            "VALUES (?,?,?,?,?,?)",
-            [(v["category_id"], v["rsid"], v.get("gene"), v.get("relevance"),
-              v.get("genotype"), v.get("zygosity")) for v in seed.get("variants", [])])
+            "INSERT INTO variants (category_id, rsid, gene, relevance, genotype, zygosity, "
+            "effect_allele, effect_copies) VALUES (?,?,?,?,?,?,?,?)", rows)
 
         if seed.get("unified_protocol"):
             conn.execute("INSERT INTO unified_protocol (protocol) VALUES (?)", (seed["unified_protocol"],))
@@ -141,6 +171,12 @@ def _self_check():
         restored = d / "r.db"
         restored.write_bytes(gzip.decompress(gz.read_bytes()))
         assert sqlite3.connect(restored).execute("SELECT x FROM t").fetchone() == ("Testium",)
+    # migrate: an old database gains what schema.sql added, and a second run changes nothing
+    old = sqlite3.connect(":memory:")
+    old.execute("CREATE TABLE test_results (id INTEGER PRIMARY KEY, biomarker_id INTEGER, date DATE, value TEXT)")
+    done = migrate(old)
+    assert "+test_results.lab" in done and "+table variants" in done, done
+    assert migrate(old) == [], "migrate is not idempotent"
     print("self-check OK")
 
 

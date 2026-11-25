@@ -324,6 +324,25 @@ def zygosity(user_gt, rec):
     return "hom" if match(user_gt, rec.get("genotypes", {})) is None else "hom-ref"
 
 
+def effect(user_gt, rec):
+    """(effect_allele, copies) for a call: the allele the entry's interpretation is about,
+    on the CALL's strand, and how many copies the call carries. The allele is the single
+    homozygote of the `risk` list, or an explicit `effect` letter (which must name its
+    `source`). (None, None) when the entry gives no direction or the call fits neither strand
+    — unknown is an answer; a guessed direction is how "hom-alt" came to be read as "risk"
+    at sites where the reference genome carries the minor allele."""
+    hom = next((r for r in rec.get("risk") or [] if len(r) == 2 and r[0] == r[1]), None)
+    a = hom[0] if hom else rec.get("effect")
+    alleles = set("".join(rec.get("genotypes", {})).upper())
+    if not a or not user_gt:
+        return None, None
+    if not set(user_gt) <= alleles:
+        if palindromic(rec.get("genotypes", {})) or not set(rc(user_gt)) <= alleles:
+            return None, None                    # not this site's alleles on either strand
+        a = COMP[a]                              # the catalogue lists the other strand
+    return a, user_gt.count(a)
+
+
 # ── APOE ε genotype (two-SNP haplotype; can't use the single-SNP map) ─────────
 _APOE = {   # (sorted rs429358 gt, sorted rs7412 gt) -> ε genotype
     ("CC", "CC"): "ε4/ε4", ("CT", "CC"): "ε3/ε4", ("TT", "CC"): "ε3/ε3",
@@ -357,12 +376,13 @@ def apoe_call(genome):
     zyg = "hom-alt" if e == "ε4/ε4" else ("het" if "ε4" in e else "hom-ref")
     return {"rsid": "rs429358", "gene": "APOE", "genotype": e,
             "zygosity": zyg, "relevance": _APOE_REL.get(e, e),
-            "category": "Biological Age & Longevity"}
+            "category": "Biological Age & Longevity", "effect": ("ε4", e.count("ε4"))}
 
 
 # ── Build + write ────────────────────────────────────────────────────────────
 def build_rows(genome, catalogue, cat_ids):
-    """Return [(category_id, rsid, gene, relevance, genotype, zygosity), ...]."""
+    """Return [(category_id, rsid, gene, relevance, genotype, zygosity, effect_allele,
+    effect_copies), ...]."""
     rows = []
     for rsid, rec in catalogue.items():
         if rsid.startswith("_") or rsid in ("rs429358", "rs7412"):  # APOE handled below
@@ -374,12 +394,12 @@ def build_rows(genome, catalogue, cat_ids):
         if cid is None:
             continue
         rel = match(gt, rec["genotypes"]) or f"genotype {gt} (not in catalogue for this rsID)"
-        rows.append((cid, rsid, rec.get("gene", ""), rel, gt, zygosity(gt, rec)))
+        rows.append((cid, rsid, rec.get("gene", ""), rel, gt, zygosity(gt, rec), *effect(gt, rec)))
 
     apoe = apoe_call(genome)
     if apoe and apoe["category"] in cat_ids:
         rows.append((cat_ids[apoe["category"]], apoe["rsid"], apoe["gene"],
-                     apoe["relevance"], apoe["genotype"], apoe["zygosity"]))
+                     apoe["relevance"], apoe["genotype"], apoe["zygosity"], *apoe["effect"]))
     return rows
 
 
@@ -414,6 +434,8 @@ def main():
 
     conn = sqlite3.connect(DB)
     conn.execute("PRAGMA foreign_keys = ON")
+    from init_db import migrate
+    migrate(conn)                                # a database from before effect_allele gains it
     cat_ids = dict(conn.execute("SELECT name_en, id FROM categories").fetchall())
     rows = build_rows(genome, catalogue, cat_ids)
     cat_rsids = [k for k in catalogue if not k.startswith("_")]
@@ -421,8 +443,8 @@ def main():
     # hand-promoted (non-catalogue) rows are left alone
     conn.execute(f"DELETE FROM variants WHERE rsid IN ({','.join('?' * len(cat_rsids))})", cat_rsids)
     conn.executemany(
-        "INSERT OR REPLACE INTO variants "
-        "(category_id, rsid, gene, relevance, genotype, zygosity) VALUES (?,?,?,?,?,?)",
+        "INSERT OR REPLACE INTO variants (category_id, rsid, gene, relevance, genotype, "
+        "zygosity, effect_allele, effect_copies) VALUES (?,?,?,?,?,?,?,?)",
         rows)
     conn.commit()
     conn.close()
@@ -488,10 +510,22 @@ def _self_check():
     assert zygosity("TT", {"risk": ["AA"], "genotypes": pal}) == "hom-ref"     # palindromic: TT is not flipped AA
     assert zygosity("AA", {"risk": ["CC"], "genotypes": {"CC": 1, "CG": 1, "GG": 1}}) == "hom"  # not a listed genotype
     assert zygosity("T", {"risk": ["CC"]}) == "hemi"
+    # effect allele + copies, on the call's strand; unknown stays unknown
+    mthfr = {"genotypes": {"GG": 1, "AG": 1, "AA": 1}, "risk": ["AA"]}
+    assert effect("AG", mthfr) == ("A", 1) and effect("GG", mthfr) == ("A", 0)
+    assert effect("CT", mthfr) == ("T", 1) and effect("TT", mthfr) == ("T", 2)   # other strand
+    assert effect("AG", {"genotypes": {"GG": 1, "AG": 1}}) == (None, None)        # no direction on file
+    assert effect("CG", {"genotypes": {"AA": 1, "AG": 1}, "risk": ["AA"]}) == (None, None)  # wrong site
+    assert effect("A", {"genotypes": {"A": 1, "G": 1}, "effect": "A"}) == ("A", 1)  # hemizygous
+    # the catalogue: a direction given without a risk list must name its source
+    cat = json.loads(CATALOGUE.read_text())
+    unsourced = [k for k, r in cat.items() if not k.startswith("_") and r.get("effect") and not r.get("source")]
+    assert not unsourced, f"`effect` without `source`: {unsourced}"
     # APOE haplotypes
     assert apoe_call({"rs429358": "TT", "rs7412": "CC"})["genotype"] == "ε3/ε3"
     assert apoe_call({"rs429358": "CT", "rs7412": "CC"})["genotype"] == "ε3/ε4"
     assert apoe_call({"rs429358": "CC", "rs7412": "CC"})["zygosity"] == "hom-alt"
+    assert apoe_call({"rs429358": "CT", "rs7412": "CC"})["effect"] == ("ε4", 1)
     assert apoe_call({"rs429358": "TT"}) is None       # needs both SNPs
     # query_vcf: same result whether bcftools serves it or the stdlib fallback does
     import tempfile

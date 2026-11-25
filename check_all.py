@@ -26,7 +26,8 @@ from pathlib import Path
 ROOT = Path(__file__).parent
 DB = ROOT / "labs.db"
 
-SELF_CHECKS = ["init_db.py", "inspect_import.py", "import_dna.py", "lookup_variant.py", "seed_ref_ranges.py",
+SELF_CHECKS = ["init_db.py", "inspect_import.py", "import_dna.py", "lookup_variant.py", "check_variants.py",
+               "seed_ref_ranges.py",
                "screening_calendar.py", "export_for_llm.py", "viewer.py"]
 # generated from labs.db; warn when older than it (or, for the viewer, missing)
 ARTIFACTS = ["viewer.html", "master_protocol.md", "labs_export.md", "labs_summary.md"]
@@ -150,6 +151,16 @@ def main():
     bad = db_invariants(con)
     print("\n".join(bad) if bad else "OK — no orphans, no future-dated results")
 
+    import check_variants as CV
+    print("\n── variants: direction in prose, promoted rows vs genome [CONSISTENCY] ──")
+    vbad = [f"{w}: {r} {what} written up as carried — \"{s}\"" for w, r, what, s in CV.carried_claims(con)]
+    mism, unread = CV.promoted_vs_genome(con)
+    vbad += mism
+    print("\n".join(vbad) if vbad else "OK — no 0-copy variant written up as carried; promoted rows match the genome")
+    for u in unread:
+        print(f"  (report) {u}")
+    bad += vbad
+
     print("\n── stale insights vs labs [report] ──")
     st = stale_insights(con)
     print("\n".join(st) if st else "OK — every category with labs has an insight at least as new")
@@ -165,7 +176,7 @@ def main():
     if broken:
         print(f"BROKEN — {len(broken)} self-check(s) did not run cleanly (tooling, not data): {', '.join(broken)}")
     if bad:
-        print(f"FAIL — db invariants need reconciling")
+        print(f"FAIL — {len(bad)} consistency violation(s) need reconciling")
     if broken or bad:
         return 1
     print("OK — no consistency check is failing.")

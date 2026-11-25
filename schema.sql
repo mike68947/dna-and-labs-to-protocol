@@ -62,8 +62,11 @@ CREATE TABLE variants (               -- populated by import_dna.py from your DN
     gene         TEXT,
     relevance    TEXT,                 -- interpretation string (viewer renders this)
     genotype     TEXT,                 -- e.g. "CT" or "ε3/ε4"
-    zygosity     TEXT,                 -- 'het' | 'hom-alt' | 'hom-ref' | 'hom' (homozygous, effect allele
-                                       -- unknown: the catalogue entry has no `risk` list)
+    zygosity     TEXT,                 -- relative to the catalogue's RISK genotype, not the reference genome:
+                                       -- 'het' | 'hom-alt' (the flagged homozygote) | 'hom-ref' (another listed
+                                       -- homozygote) | 'hom' (direction unknown) | 'hemi' (one copy, e.g. male X)
+    effect_allele TEXT,                -- the allele the interpretation is about, on the call's strand (NULL = no source)
+    effect_copies INTEGER,             -- copies of it in the call: 0 / 1 / 2 (NULL = unknown). Read direction HERE.
     UNIQUE(category_id, rsid)
 );
 

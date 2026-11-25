@@ -31,6 +31,8 @@ markers and the ref range.
 import argparse, json, re, sys, sqlite3, statistics as st
 from pathlib import Path
 
+from init_db import migrate
+
 # known conversion ratios (>1) → human label, to name a suspected mismatch
 FACTORS = {
     10: 'decimal shift / ×10', 100: '×100', 1000: 'cells/µL↔×10⁹/L or SI-prefix/×1000',
@@ -72,18 +74,12 @@ def outside_corridor(x, hist, slack=CORRIDOR_SLACK):
     return None
 
 
-def ensure_lab_column(conn):
-    """Databases created before test_results.lab existed get it here (idempotent)."""
-    if 'lab' not in {r[1] for r in conn.execute("PRAGMA table_info(test_results)")}:
-        conn.execute("ALTER TABLE test_results ADD COLUMN lab TEXT")
-
-
 def inspect(conn, rows, lab=None):
     """rows: iterable of (biomarker_id, date, value). Returns a list of dicts,
     each with verdict 'OK'|'SUSPECT' and a reason. Non-numeric values pass as OK.
     `lab` (this batch's laboratory) sharpens a corridor flag when it differs from the
     laboratory of the biomarker's previous result."""
-    ensure_lab_column(conn)
+    migrate(conn)                       # a database from before test_results.lab gains it
     out = []
     for bid, date, value in rows:
         x = _num(value)
@@ -169,7 +165,7 @@ def _self_check():
     conn.execute("INSERT INTO biomarkers VALUES(1,'Testium','mmol/L',0.7,1.0)")
     for d, v in [('a', '0.9'), ('b', '0.95'), ('c', '0.88'), ('d', '1.0')]:
         conn.execute("INSERT INTO test_results VALUES(1,?,?)", (d, v))
-    ensure_lab_column(conn)                          # an old database gains the column
+    migrate(conn)                                    # an old database gains the column
     conn.execute("UPDATE test_results SET lab='Lab A'")
     ok = inspect(conn, [(1, 'e', '0.92')])          # normal → OK
     mgL = inspect(conn, [(1, 'e', '22.1')])          # mmol/L value entered as mg/L (×24.3) → SUSPECT

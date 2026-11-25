@@ -46,6 +46,9 @@ def compose_protocol(supplements, diet, activity, lifestyle, checkups):
 
 def load_data():
     con = sqlite3.connect(DB)
+    from init_db import migrate
+    if migrate(con):                       # a labs.db made by an older version gains the new columns/tables
+        con.commit()
     cur = con.cursor()
 
     categories = cur.execute(
@@ -82,14 +85,14 @@ def load_data():
         }
 
     # variants (genotypes matched from the user's DNA file by import_dna.py)
-    rsids = {}  # category_id → [{rsid, gene, relevance, genotype, zygosity}, ...]
+    rsids = {}  # category_id → [{rsid, gene, relevance, genotype, zygosity, effect}, ...]
     for row in cur.execute(
-        'SELECT category_id, rsid, gene, relevance, genotype, zygosity '
+        'SELECT category_id, rsid, gene, relevance, genotype, zygosity, effect_allele, effect_copies '
         'FROM variants ORDER BY category_id, gene'
     ):
         rsids.setdefault(row[0], []).append({
             'rsid': row[1], 'gene': row[2] or '', 'rel': row[3] or '',
-            'gt': row[4] or '', 'zyg': row[5] or '',
+            'gt': row[4] or '', 'zyg': row[5] or '', 'ea': row[6], 'ec': row[7],
         })
 
     # Unified protocol
@@ -273,10 +276,10 @@ body { background: var(--bg); color: var(--text); font: 13px/1.4 'Inter', system
 .rsid-table td:nth-child(2) { color: var(--accent2); font-weight: 500; font-size: 11px; }
 .rsid-table tr:hover { background: var(--hover); }
 .rsid-table .gt-cell { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11px; }
-.rsid-table .gt-cell.hom-alt { color: #e74c3c; }
-.rsid-table .gt-cell.het { color: #f39c12; }
-.rsid-table .gt-cell.hom-ref { color: #2ecc71; }
-.rsid-table .gt-cell.hom { color: #95a5a6; }   /* homozygous, effect allele unknown */
+.rsid-table .gt-cell.e2 { color: #e74c3c; }   /* colour = copies of the effect allele, never zygosity */
+.rsid-table .gt-cell.e1 { color: #f39c12; }
+.rsid-table .gt-cell.e0 { color: #2ecc71; }
+.rsid-table .gt-cell.eu { color: #95a5a6; }   /* direction unknown */
 .rsid-table .gt-cell.no-data { color: var(--border); }
 .no-insight { color: var(--muted); font-style: italic; }
 
@@ -358,6 +361,8 @@ body { background: var(--bg); color: var(--text); font: 13px/1.4 'Inter', system
 .legend .dot-hom { background: #e74c3c; }
 .legend .dot-het { background: #f39c12; }
 .legend .dot-none { background: var(--border); }
+.legend .dot-ref { background: #2ecc71; }
+.legend .dot-unk { background: #95a5a6; }
 
 /* ── Table ── */
 #table-wrap { flex: 1; overflow: auto; }
@@ -639,14 +644,13 @@ function renderInsights(catId) {
   let paneVariants = `<div class="insight-pane" id="pane-variants">`;
   if (rsids.length) {
     paneVariants += `<div class="rsid-section"><h3>Genetic Variants (${found} of ${rsids.length} found in genome)</h3>`;
-    paneVariants += `<div class="legend"><span><span class="dot dot-hom"></span> Homozygous alt</span><span><span class="dot dot-het"></span> Heterozygous</span><span><span class="dot dot-none"></span> Not found</span></div>`;
-    paneVariants += `<table class="rsid-table"><thead><tr><th>rsID</th><th>Gene</th><th>Genotype</th><th>Zygosity</th><th>Relevance</th></tr></thead><tbody>`;
+    paneVariants += `<div class="legend">Copies of the effect allele: <span><span class="dot dot-hom"></span> 2</span><span><span class="dot dot-het"></span> 1</span><span><span class="dot dot-ref"></span> 0</span><span><span class="dot dot-unk"></span> direction unknown</span><span><span class="dot dot-none"></span> not found</span></div>`;
+    paneVariants += `<table class="rsid-table"><thead><tr><th>rsID</th><th>Gene</th><th>Genotype</th><th title="Relative to the catalogue's risk genotype, not to the reference genome">Zygosity</th><th>Effect allele</th><th>Relevance</th></tr></thead><tbody>`;
     const sorted = [...rsids].sort((a, b) => (b.gt ? 1 : 0) - (a.gt ? 1 : 0));
     sorted.forEach(r => {
-      const cls = r.zyg || 'no-data';
-      const gt = r.gt || '-';
-      const zyg = r.zyg || '-';
-      paneVariants += `<tr><td>${escH(r.rsid)}</td><td>${escH(r.gene)}</td><td class="gt-cell ${cls}">${escH(gt)}</td><td class="gt-cell ${cls}">${escH(zyg)}</td><td>${escH(r.rel)}</td></tr>`;
+      const cls = !r.gt ? 'no-data' : (r.ec == null ? 'eu' : 'e' + Math.min(r.ec, 2));
+      const eff = r.ec == null ? 'unknown' : `${r.ea} ×${r.ec}`;
+      paneVariants += `<tr><td>${escH(r.rsid)}</td><td>${escH(r.gene)}</td><td class="gt-cell ${cls}">${escH(r.gt || '-')}</td><td>${escH(r.zyg || '-')}</td><td class="gt-cell ${cls}">${escH(r.gt ? eff : '-')}</td><td>${escH(r.rel)}</td></tr>`;
     });
     paneVariants += `</tbody></table></div>`;
   } else {
@@ -740,14 +744,15 @@ function buildVariantBurden(rsids) {
   if (!rsids.length) return '';
   const found = rsids.filter(r => r.gt);
   if (!found.length) return '';
+  // scored from effect_copies only: a heterozygote of an entry with no direction is not burden
   const byGene = {};
   found.forEach(r => {
     const g = r.gene || '(unknown)';
     if (!byGene[g]) byGene[g] = {homAlt: 0, het: 0, homRef: 0, hom: 0};
-    if (r.zyg === 'hom-alt')      byGene[g].homAlt++;
-    else if (r.zyg === 'het')     byGene[g].het++;
-    else if (r.zyg === 'hom-ref') byGene[g].homRef++;
-    else if (r.zyg === 'hom')     byGene[g].hom++;   // effect allele unknown — counted, not scored
+    if (r.ec == null)       byGene[g].hom++;      // direction unknown — counted, not scored
+    else if (r.ec >= 2)     byGene[g].homAlt++;
+    else if (r.ec === 1)    byGene[g].het++;
+    else                    byGene[g].homRef++;
   });
   const genes = Object.keys(byGene).sort((a, b) => {
     const sa = byGene[a].homAlt * 2 + byGene[a].het;
@@ -760,10 +765,10 @@ function buildVariantBurden(rsids) {
     const b = byGene[g];
     const total = b.homAlt + b.het + b.homRef + b.hom;
     const parts = [];
-    if (b.homAlt)  parts.push(`<span class="z-hom">${b.homAlt} hom-alt</span>`);
-    if (b.het)     parts.push(`<span class="z-het">${b.het} het</span>`);
-    if (b.homRef)  parts.push(`<span class="z-ref">${b.homRef} hom-ref</span>`);
-    if (b.hom)     parts.push(`<span class="z-unk">${b.hom} hom</span>`);
+    if (b.homAlt)  parts.push(`<span class="z-hom">${b.homAlt} × 2 effect copies</span>`);
+    if (b.het)     parts.push(`<span class="z-het">${b.het} × 1 copy</span>`);
+    if (b.homRef)  parts.push(`<span class="z-ref">${b.homRef} × none</span>`);
+    if (b.hom)     parts.push(`<span class="z-unk">${b.hom} × direction unknown</span>`);
     html += `<tr><td class="gene-cell">${escH(g)}</td>`
          +  `<td class="zyg-cell">${parts.join(' + ')}</td>`
          +  `<td class="count-cell">${total}</td></tr>`;
