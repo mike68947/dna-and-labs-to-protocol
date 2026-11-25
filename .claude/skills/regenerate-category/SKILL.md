@@ -31,7 +31,7 @@ Rewrite a single `category_insights` row grounded in the person's real data.
      category is genomically loaded — does the lab evidence confirm the genetic prediction?
 
 3. **Commit**: `UPDATE category_insights SET ... , updated_at = date('now') WHERE category_id = :id;`
-   (git is your backup — commit before large rewrites.)
+   (Back up first: `python3 init_db.py --backup` — labs.db is git-ignored, so git is no backup.)
 
 4. **Reconcile + rebuild**: if a supplement/dose/rule changed, grep `unified_protocol` for it
    and update that too. Then `python3 viewer.py`.

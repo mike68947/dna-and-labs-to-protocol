@@ -297,9 +297,9 @@
   "category": "Biological Age & Longevity",
   "note": "Pro72Arg; apoptosis vs longevity trade-off",
   "genotypes": {
-   "GG": "Arg/Arg — stronger apoptosis",
-   "CG": "Pro/Arg",
-   "CC": "Pro/Pro — associated with longevity in some cohorts, weaker tumor suppression"
+   "GG": "Pro/Pro — associated with longevity in some cohorts, weaker tumor suppression",
+   "CG": "Pro/Arg (genomic plus strand: G = Pro72, C = Arg72)",
+   "CC": "Arg/Arg — stronger apoptosis"
   },
   "chrom": "17",
   "pos": {
@@ -312,9 +312,9 @@
   "category": "Biological Age & Longevity",
   "note": "I405V; HDL size & longevity",
   "genotypes": {
-   "AA": "Val/Val — larger HDL, longevity-associated in some studies",
-   "AG": "Intermediate",
-   "GG": "Ile/Ile"
+   "AA": "Ile/Ile",
+   "AG": "Ile/Val — intermediate",
+   "GG": "Val/Val — larger HDL, longevity-associated in some studies"
   },
   "chrom": "16",
   "pos": {
@@ -373,7 +373,7 @@
  "rs1801133": {
   "gene": "MTHFR",
   "category": "Vitamins",
-  "note": "C677T; folate metabolism (verify strand)",
+  "note": "C677T; folate metabolism (677T = A on the genomic plus strand)",
   "genotypes": {
    "GG": "Normal MTHFR activity",
    "AG": "~65% activity — modest homocysteine effect",

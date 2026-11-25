@@ -9,7 +9,10 @@ text, and DNA (a VCF or a 23andMe/AncestryDNA raw file); Claude imports them int
 SQLite database (`labs.db`), and `viewer.py` renders a single self-contained `viewer.html`
 with charts, genetic variants, per-category insights, and a master protocol.
 
-**`labs.db` is the source of truth.** It's git-ignored and rebuilt by `init_db.py`. All
+**`labs.db` is the source of truth, and once it holds your data nothing can rebuild it** — it is
+git-ignored, and `init_db.py` only creates the demo or an empty database. Back it up before every
+session that writes to it: `python3 init_db.py --backup` (gzipped into `backups/`, newest 14 kept;
+restore with `gunzip -c backups/labs-<stamp>.db.gz > labs.db`). All
 edits happen against `labs.db` directly (or against `data/seed.json` if you want them in
 the seeded example). Python standard library only, plus optional `bcftools` for fast VCF
 queries (pure-Python fallback); Chart.js is vendored (`vendor/chart.umd.min.js`, pinned 4.5.1)

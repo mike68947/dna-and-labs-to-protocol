@@ -5,7 +5,10 @@
 *.db-wal
 inputs/*
 !inputs/.gitkeep
-imports/          # your dated import scripts (they contain your values)
+# your dated import scripts (they contain your values)
+imports/
+# gzipped snapshots of labs.db (init_db.py --backup)
+backups/
 
 # Generated outputs
 viewer.html

@@ -12,7 +12,7 @@ Orientation-safe: consumer chips and dbSNP don't always report on the same DNA
 strand, so every match is tried directly AND reverse-complemented before giving
 up — except for palindromic (A/T, C/G) SNPs, where the flip of one homozygote IS
 the opposite homozygote, so a flip is undetectable and those are taken as
-reported (both file kinds are normally dbSNP-forward). VCF sites are pulled with bcftools when it's installed (fast random access on
+reported (both file kinds report the genomic plus strand). VCF sites are pulled with bcftools when it's installed (fast random access on
 a bgzipped, tabix-indexed VCF) and by a pure-Python scan otherwise — so it runs
 with or without bcftools; no snpEff or reference genome is needed.
 
@@ -152,14 +152,14 @@ def a23_call(cols):
         return None
     rsid = cols[0]
     gt = (cols[3] if len(cols) == 4 else cols[3] + cols[4]).upper()
-    if rsid.startswith("rs") and len(gt) == 2 and set(gt) <= set("ACGT"):
+    if rsid.startswith("rs") and len(gt) in (1, 2) and set(gt) <= set("ACGT"):   # 1 letter = hemizygous (male X/Y/MT)
         return rsid, gt
     return None
 
 
 def parse_23andme(text):
     """23andMe (rsid, chrom, pos, genotype) or AncestryDNA (rsid, chrom, pos,
-    allele1, allele2). Returns {rsid: 'AG'} for clean 2-base ACGT calls."""
+    allele1, allele2). Returns {rsid: 'AG'} for clean ACGT calls ('A' when hemizygous)."""
     out = {}
     for line in text.splitlines():
         if line.startswith("#") or not line.strip():
@@ -170,20 +170,30 @@ def parse_23andme(text):
     return out
 
 
-STATS = {"filtered": 0}   # ponytail: module counter for non-PASS catalogue sites; thread a stats object through if this grows
+STATS = {"filtered": 0, "unclear": set()}   # ponytail: module counters (non-PASS sites; wanted rsIDs whose record
+                                            # held no confident call); thread a stats object through if this grows
+
+
+def vcf_rsid(cols, pos_index=None):
+    """The rsID of a VCF record: its ID column, else its (chrom, pos) in pos_index."""
+    chrom, pos, vid = cols[0], cols[1], cols[2]
+    if vid.startswith("rs"):
+        return vid
+    if pos_index is not None and pos.isdigit():
+        return pos_index.get((norm_chrom(chrom), int(pos)))
+    return None
 
 
 def vcf_call(cols, pos_index=None):
     """One VCF data line (split on tab) -> (rsid, 'CT') or None. The rsID comes
     from the ID column; if that's blank ('.') and pos_index is given, it's
-    recovered from (chrom, pos). Only clean 2-allele ACGT calls that passed the
-    caller's filters (FILTER is PASS or '.') are returned."""
+    recovered from (chrom, pos). Only clean ACGT calls that passed the caller's
+    filters (FILTER is PASS or '.') are returned: two letters for a diploid call,
+    one for a hemizygous call (GT '1' on a male X) — a half-missing '0/.' is no call."""
     if len(cols) < 10:
         return None
-    chrom, pos, vid, ref, alt = cols[0], cols[1], cols[2], cols[3], cols[4].split(",")
-    rsid = vid if vid.startswith("rs") else None
-    if rsid is None and pos_index is not None and pos.isdigit():
-        rsid = pos_index.get((norm_chrom(chrom), int(pos)))
+    ref, alt = cols[3], cols[4].split(",")
+    rsid = vcf_rsid(cols, pos_index)
     if not rsid:
         return None
     if cols[6] not in (".", "PASS", ""):      # a filtered call is not a confident genotype
@@ -194,7 +204,7 @@ def vcf_call(cols, pos_index=None):
     called = [alleles[int(i)] for i in idx
               if i not in (".", "") and i.isdigit() and int(i) < len(alleles)]
     gt = "".join(called)
-    if len(gt) == 2 and set(gt) <= set("ACGT"):
+    if len(called) == len(idx) and len(gt) in (1, 2) and set(gt) <= set("ACGT"):
         return rsid, gt
     return None
 
@@ -251,17 +261,22 @@ def query_vcf(path, pos_index, wanted):
                 call = vcf_call(cols, pos_index)
                 if call and call[0] in wanted:
                     out[call[0]] = call[1]
+                elif not call and vcf_rsid(cols, pos_index) in wanted:
+                    STATS["unclear"].add(vcf_rsid(cols, pos_index))
             return out
     out = {}
     with open_text(path) as f:
         for line in f:
             if line.startswith("#") or not line.strip():
                 continue
-            call = vcf_call(line.rstrip("\n").split("\t"), pos_index or None)
+            cols = line.rstrip("\n").split("\t")
+            call = vcf_call(cols, pos_index or None)
             if call and call[0] in wanted:
                 out[call[0]] = call[1]
                 if len(out) == len(wanted):
                     break
+            elif not call and len(cols) >= 10 and vcf_rsid(cols, pos_index or None) in wanted:
+                STATS["unclear"].add(vcf_rsid(cols, pos_index or None))
     return out
 
 
@@ -288,10 +303,14 @@ def match(user_gt, genotypes):
 
 
 def zygosity(user_gt, rec):
-    """het if the two alleles differ. For a homozygote: 'hom-alt' / 'hom-ref' when the
-    record carries a `risk` list (is this the flagged genotype or not); plain 'hom' when
-    it doesn't — the effect allele is then unknown, and calling it 'hom-ref' painted
-    homozygous functional genotypes (FUT2 AA non-secretor) green in the viewer."""
+    """Relative to the catalogue's `risk` list, NOT to the reference genome (where the
+    reference allele is often the minor or the effect one). 'hemi' for a one-copy call;
+    'het' if the two alleles differ. A homozygote is 'hom-alt' when it is the flagged
+    genotype and 'hom-ref' when it is another genotype the entry lists; plain 'hom' when
+    the entry has no `risk` list or doesn't list this genotype — the effect is then
+    unknown, and 'hom-ref' would paint it green in the viewer."""
+    if len(user_gt) == 1:
+        return "hemi"
     if user_gt[0] != user_gt[1]:
         return "het"
     risk_list = rec.get("risk") or []
@@ -300,7 +319,9 @@ def zygosity(user_gt, rec):
     risk = {canon(r) for r in risk_list}
     if not palindromic(rec.get("genotypes", {})):
         risk |= {canon(rc(r)) for r in risk_list}   # strand-agnostic; unsafe for palindromic SNPs
-    return "hom-alt" if canon(user_gt) in risk else "hom-ref"
+    if canon(user_gt) in risk:
+        return "hom-alt"
+    return "hom" if match(user_gt, rec.get("genotypes", {})) is None else "hom-ref"
 
 
 # ── APOE ε genotype (two-SNP haplotype; can't use the single-SNP map) ─────────
@@ -395,6 +416,10 @@ def main():
     conn.execute("PRAGMA foreign_keys = ON")
     cat_ids = dict(conn.execute("SELECT name_en, id FROM categories").fetchall())
     rows = build_rows(genome, catalogue, cat_ids)
+    cat_rsids = [k for k in catalogue if not k.startswith("_")]
+    # replace, don't accumulate: a catalogue row from an earlier file or category must go;
+    # hand-promoted (non-catalogue) rows are left alone
+    conn.execute(f"DELETE FROM variants WHERE rsid IN ({','.join('?' * len(cat_rsids))})", cat_rsids)
     conn.executemany(
         "INSERT OR REPLACE INTO variants "
         "(category_id, rsid, gene, relevance, genotype, zygosity) VALUES (?,?,?,?,?,?)",
@@ -402,10 +427,15 @@ def main():
     conn.commit()
     conn.close()
     print(f"Format {fmt}, build GRCh{build}. Matched {len(rows)} catalogued variants.")
+    absent = [k for k in cat_rsids if k not in genome and k not in ("rs429358", "rs7412")]
+    if absent:
+        print(f"  {len(absent)} catalogue site(s) absent from the file — not on the array, not called, "
+              "filtered, or (in a variant-only VCF) homozygous for the reference allele. Absence is "
+              "not a genotype: no row is written for them.")
     n_pal = sum(1 for r in rows if palindromic(catalogue.get(r[1], {}).get("genotypes", {})))
     if n_pal:
         print(f"  {n_pal} palindromic (A/T or C/G) SNP(s) taken as reported — strand can't be "
-              "verified for these; consumer files and VCFs are normally dbSNP-forward.")
+              "verified for these; consumer files and VCFs report the genomic plus strand.")
     if STATS["filtered"]:
         print(f"  {STATS['filtered']} catalogue site(s) skipped: VCF FILTER not PASS.")
     print("Next: python3 viewer.py")
@@ -422,6 +452,9 @@ def _self_check():
     assert parse_vcf("#CHROM\tPOS\nx\t1\trs1\tC\tT\t.\t.\t.\tGT\t0/1\n") == {"rs1": "CT"}
     assert parse_vcf("x\t1\trs1\tC\tT\t.\tPASS\t.\tGT\t0/1\n") == {"rs1": "CT"}
     assert parse_vcf("x\t1\trs1\tC\tT\t.\tLowQual\t.\tGT\t0/1\n") == {}     # filtered call skipped
+    assert parse_vcf("X\t1\trs1\tC\tT\t.\tPASS\t.\tGT\t1\n") == {"rs1": "T"}  # hemizygous, not dropped
+    assert parse_vcf("x\t1\trs1\tC\tT\t.\tPASS\t.\tGT\t0/.\n") == {}        # half-missing = no call
+    assert parse_23andme("rs5\tX\t9\tA\n") == {"rs5": "A"}                       # male X on a chip
     assert detect_format("##fileformat=VCFv4.2\n") == "vcf"
     assert detect_format("rs1\t1\t2\tAA\n") == "23andme"
     # genome-build detection: contig-length fingerprint, reference string, or unknown
@@ -449,10 +482,12 @@ def _self_check():
     # hom not flagged -> hom-ref; no risk list -> plain 'hom' (effect allele unknown)
     assert zygosity("CT", {}) == "het"
     assert zygosity("CC", {"risk": ["CC"]}) == "hom-alt"
-    assert zygosity("TT", {"risk": ["CC"]}) == "hom-ref"
+    assert zygosity("TT", {"risk": ["CC"], "genotypes": genos}) == "hom-ref"
     assert zygosity("GG", {"risk": ["CC"], "genotypes": genos}) == "hom-alt"   # flipped risk genotype
     assert zygosity("TT", {}) == "hom"
     assert zygosity("TT", {"risk": ["AA"], "genotypes": pal}) == "hom-ref"     # palindromic: TT is not flipped AA
+    assert zygosity("AA", {"risk": ["CC"], "genotypes": {"CC": 1, "CG": 1, "GG": 1}}) == "hom"  # not a listed genotype
+    assert zygosity("T", {"risk": ["CC"]}) == "hemi"
     # APOE haplotypes
     assert apoe_call({"rs429358": "TT", "rs7412": "CC"})["genotype"] == "ε3/ε3"
     assert apoe_call({"rs429358": "CT", "rs7412": "CC"})["genotype"] == "ε3/ε4"

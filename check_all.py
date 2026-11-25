@@ -26,7 +26,7 @@ from pathlib import Path
 ROOT = Path(__file__).parent
 DB = ROOT / "labs.db"
 
-SELF_CHECKS = ["inspect_import.py", "import_dna.py", "lookup_variant.py", "seed_ref_ranges.py",
+SELF_CHECKS = ["init_db.py", "inspect_import.py", "import_dna.py", "lookup_variant.py", "seed_ref_ranges.py",
                "screening_calendar.py", "export_for_llm.py", "viewer.py"]
 # generated from labs.db; warn when older than it (or, for the viewer, missing)
 ARTIFACTS = ["viewer.html", "master_protocol.md", "labs_export.md", "labs_summary.md"]
@@ -67,10 +67,20 @@ def stale_insights(con):
     return out
 
 
+BACKUP_LAG_DAYS = 3
+
+
 def freshness():
-    """→ warning strings: generated artifacts older than labs.db (viewer.html also if missing)."""
+    """→ warning strings: generated artifacts older than labs.db (viewer.html also if missing),
+    and the newest backup more than BACKUP_LAG_DAYS behind labs.db (none at all counts)."""
     db_mtime = DB.stat().st_mtime
     warns = []
+    snaps = sorted((ROOT / "backups").glob("labs-*.db.gz"), key=lambda p: p.stat().st_mtime)
+    if not snaps:
+        warns.append("backups/: no snapshot of labs.db — python3 init_db.py --backup")
+    elif db_mtime - snaps[-1].stat().st_mtime > BACKUP_LAG_DAYS * 86400:
+        warns.append(f"backups/: newest snapshot is more than {BACKUP_LAG_DAYS} days behind labs.db "
+                     "— python3 init_db.py --backup")
     for name in ARTIFACTS:
         p = ROOT / name
         if not p.exists():
@@ -145,9 +155,9 @@ def main():
     print("\n".join(st) if st else "OK — every category with labs has an insight at least as new")
     con.close()
 
-    print("\n── generated files vs labs.db [report] ──")
+    print("\n── generated files and backups vs labs.db [report] ──")
     fresh = freshness()
-    print("\n".join(fresh) if fresh else "OK — artifacts newer than labs.db")
+    print("\n".join(fresh) if fresh else "OK — artifacts newer than labs.db, a recent backup exists")
 
     print("\n" + "=" * 60)
     # A broken self-check and a data inconsistency are different failures — reporting a

@@ -10,7 +10,7 @@ auto-composes it — you synthesize it.
 
 ## Steps
 
-1. **Gather**: read `user_facts.md` (this dir) for age/sex/history; the latest value per
+1. **Gather**: read `inputs/user_facts.md` (git-ignored; template `data/user_facts.example.md`) for age/sex/history; the latest value per
    biomarker; all non-null `category_insights` protocol columns; `variants`; the person's
    current supplement/medication stack (ask the user, or read a stack file if they keep one).
 
@@ -19,7 +19,7 @@ auto-composes it — you synthesize it.
    **C. Activity**, **D. Lifestyle**, **E. Monitoring** (labs + cadence + targets),
    **H. Pharmacogenomics**. Include only items actually in use; note deferred items separately.
 
-3. **Commit** (git is your backup — commit first):
+3. **Commit** (back up first: `python3 init_db.py --backup` — labs.db is git-ignored, so git is no backup):
    ```sql
    UPDATE unified_protocol SET protocol = :blob, updated_at = datetime('now') WHERE id = 1;
    -- or INSERT if the table is empty

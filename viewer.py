@@ -167,8 +167,9 @@ def build_json(categories, biomarkers, bm_cats, results, insights, rsids, unifie
 
 
 # DOB drives age-at-draw for age-banded personalized ranges. Lives only in the
-# git-ignored user_facts.md; fall back to the known value if the file is absent.
-USER_FACTS = Path('.claude/skills/regenerate-unified-protocol/user_facts.md')
+# git-ignored inputs/user_facts.md (template: data/user_facts.example.md); a
+# placeholder is used while that file is absent.
+USER_FACTS = Path(__file__).parent / 'inputs' / 'user_facts.md'
 
 
 def read_dob(default='1980-01-01'):

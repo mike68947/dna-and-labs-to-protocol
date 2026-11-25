@@ -1,7 +1,8 @@
 # User facts
 
-Hand-authored context for protocol synthesis. Fill this in with your own details; it feeds
-the unified-protocol regeneration and the viewer's age-at-draw calculation.
+Copy this file to `inputs/user_facts.md` (git-ignored — it holds personal details) and fill it
+in there. It feeds the routine's synthesis and the viewer's age-at-draw calculation; never fill
+in this tracked copy.
 
 DOB: 1980-01-01
 

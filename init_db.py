@@ -5,11 +5,19 @@ own (import your labs/DNA/imaging — see CLAUDE.md).
 
     python3 init_db.py            # create labs.db + a tiny synthetic demo (renders out of the box)
     python3 init_db.py --empty    # clean start: schema + categories + screenings, NO demo data
-    python3 init_db.py --force    # overwrite an existing labs.db
+    python3 init_db.py --force    # overwrite an existing labs.db (backs it up first)
+    python3 init_db.py --backup   # gzipped snapshot of labs.db into backups/ (keeps the newest 14)
+
+Once you import your own data, labs.db is the ONLY copy of it — nothing rebuilds it, and
+it is git-ignored. Take a backup before every session that writes to it. Restore:
+    gunzip -c backups/labs-<stamp>.db.gz > labs.db
 """
+import gzip
 import json
+import shutil
 import sqlite3
 import sys
+import time
 from pathlib import Path
 
 import seed_ref_ranges
@@ -17,16 +25,45 @@ import screening_calendar
 
 HERE = Path(__file__).parent
 DB = HERE / "labs.db"
+BACKUPS = HERE / "backups"
+KEEP = 14
+
+
+def backup(db=DB, out_dir=BACKUPS, keep=KEEP):
+    """Snapshot `db` with SQLite's online-backup API (consistent even mid-write), gzip it
+    into out_dir/labs-<stamp>.db.gz, keep the newest `keep`. → the new file's path."""
+    out_dir.mkdir(exist_ok=True)
+    raw = out_dir / f"labs-{time.strftime('%Y%m%d-%H%M%S')}.db"
+    src, dst = sqlite3.connect(db), sqlite3.connect(raw)
+    src.backup(dst)
+    src.close()
+    dst.close()
+    gz = raw.with_name(raw.name + ".gz")
+    with open(raw, "rb") as f, gzip.open(gz, "wb") as g:
+        shutil.copyfileobj(f, g)
+    raw.unlink()
+    for old in sorted(out_dir.glob("labs-*.db.gz"))[:-keep]:
+        old.unlink()
+    return gz
 
 INSIGHT_COLS = ["category_id", "insight", "insight_dna", "supplements", "diet",
                 "activity", "lifestyle", "checkup_schedule", "concordance"]
 
 
 def main():
+    if "--self-check" in sys.argv:
+        return _self_check()
+    if "--backup" in sys.argv:
+        if not DB.exists():
+            sys.exit(f"{DB} not found — nothing to back up.")
+        print(f"Backed up to {backup().relative_to(HERE)}  (restore: gunzip -c <file> > labs.db)")
+        return
     force = "--force" in sys.argv
     empty = "--empty" in sys.argv                 # clean start for your own data (no demo rows)
     if DB.exists() and not force:
         sys.exit(f"{DB} already exists. Use --force to overwrite, or edit it directly.")
+    if DB.exists():                               # --force: never destroy the only copy unsaved
+        print(f"Backed up the existing {DB.name} to {backup().relative_to(HERE)}")
     DB.unlink(missing_ok=True)
 
     conn = sqlite3.connect(DB)
@@ -83,6 +120,27 @@ def main():
         print(f"Created {DB.name}: {nb} biomarkers, {nr} results, {ncat} categories, "
               f"{applied} ref-ranges, {n_screen} screenings.")
     print("Next: python3 viewer.py && open viewer.html")
+
+
+def _self_check():
+    import tempfile
+    with tempfile.TemporaryDirectory() as d:
+        d = Path(d)
+        db = d / "t.db"
+        c = sqlite3.connect(db)
+        c.execute("CREATE TABLE t (x)")
+        c.execute("INSERT INTO t VALUES ('Testium')")
+        c.commit()
+        c.close()
+        for _ in range(3):
+            gz = backup(db, d / "b", keep=2)
+            time.sleep(1.01)                      # distinct stamps
+        kept = sorted((d / "b").glob("labs-*.db.gz"))
+        assert len(kept) == 2 and kept[-1] == gz, kept
+        restored = d / "r.db"
+        restored.write_bytes(gzip.decompress(gz.read_bytes()))
+        assert sqlite3.connect(restored).execute("SELECT x FROM t").fetchone() == ("Testium",)
+    print("self-check OK")
 
 
 if __name__ == "__main__":
