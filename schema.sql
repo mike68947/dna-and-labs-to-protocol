@@ -35,6 +35,7 @@ CREATE TABLE test_results (
     biomarker_id  INTEGER NOT NULL REFERENCES biomarkers(id),
     date          DATE NOT NULL,
     value         TEXT,                -- TEXT preserves qualifiers: "<10", ">750", "Negative"
+    lab           TEXT,                -- the laboratory that measured it ("… (shipped sample)" when the tube travelled)
     UNIQUE(biomarker_id, date)         -- one value per marker per date; import with INSERT OR IGNORE
 );
 

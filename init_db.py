@@ -85,8 +85,9 @@ def main():
                 conn.execute("INSERT INTO biomarker_categories (biomarker_id, category_id) VALUES (?,?)",
                              (b["id"], cid))
 
-        conn.executemany("INSERT INTO test_results (biomarker_id, date, value) VALUES (?,?,?)",
-                         [(r["bid"], r["date"], r["value"]) for r in seed["results"]])
+        conn.executemany("INSERT INTO test_results (biomarker_id, date, value, lab) VALUES (?,?,?,?)",
+                         [(r["bid"], r["date"], r["value"], r.get("lab", "Example Lab"))
+                          for r in seed["results"]])
 
         for ins in seed.get("insights", []):
             conn.execute(

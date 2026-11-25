@@ -54,32 +54,12 @@ Categories are a deliberately small set of 16 (edit `schema.sql` to change them)
 Biomarker lookup key is `(name_en, specimen_en, unit)` — name alone isn't unique
 (e.g. Creatinine exists for blood and urine).
 
-## Importing labs (you read the report; no parser ships)
+## Importing labs and clinical documents
 
-The user drops a lab report (text, PDF-transcript, or a photo you transcribe) in `inputs/`.
-You extract the values — there's no format parser, that's the point.
-
-1. For each analyte: find its biomarker by `(name_en, specimen_en, unit)`, or `INSERT` a new
-   one. Set `ref_low`/`ref_high` from the reference range **the report itself states** (most
-   do). Attach `biomarker_categories`.
-2. Build the proposed `(biomarker_id, date, value)` rows. Keep `value` as TEXT.
-3. **SCREEN before inserting** — this dataset's recurring bug is values in the wrong unit or
-   with decimal-shift typos:
-   ```python
-   from inspect_import import inspect, report
-   flags = inspect(conn, rows)
-   report(flags)          # resolve EVERY 'SUSPECT' before committing — never insert unreviewed values
-   ```
-   A value in a *plausible* magnitude can still be a unit swap the screen won't catch —
-   cross-check sibling markers and the reference range by hand.
-4. `INSERT OR IGNORE` into `test_results` — the schema's `UNIQUE(biomarker_id, date)` enforces one
-   value per marker per date. (A `labs.db` created before that constraint existed:
-   `CREATE UNIQUE INDEX IF NOT EXISTS idx_results_biomarker_date ON test_results(biomarker_id, date)`.)
-5. `python3 viewer.py`, then `python3 check_all.py` (its stale-insight report is the list of
-   categories whose narrative now lags the new labs).
-
-Write each batch as a dated script, `imports/YYYY-MM-DD_<lab>.py` (git-ignored, kept on disk):
-ad-hoc inserts in a session leave no record of which report produced which rows.
+Use the `import-labs` skill (`.claude/skills/import-labs/SKILL.md`): back up, read the report
+(draw date, lab, specimen, units), insert only through
+`inspect_import.commit_import(conn, rows, lab=…, resolved={…})` from a dated
+`imports/YYYY-MM-DD_<lab>.py`, then `viewer.py` → `check_all.py`.
 
 ## Importing DNA
 

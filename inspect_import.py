@@ -7,20 +7,26 @@ cells/µL vs ×10⁹/L, mg/L vs mmol/L electrolytes, 430.54 for 43.05). Every
 import must be screened for these before the INSERT — that is the one place
 the bug can be stopped cheaply.
 
-Each proposed value is checked against (a) the biomarker's own history and
-(b) its reference range. Gross scale mismatches and matches to known
-unit-conversion factors are flagged SUSPECT for human review.
+Each proposed value is checked against (a) the biomarker's own history — its
+median (gross scale errors, known conversion factors) and its corridor (more than
+25% outside everything it has read in ≥4 prior draws) — and (b) its reference
+range. Anything off is flagged SUSPECT for human review.
 
-    from inspect_import import inspect            # inside a /tmp import script
-    flags = inspect(conn, [(biomarker_id, date, value_str), ...])
-    # resolve every flag['verdict']=='SUSPECT' before committing the insert
+    from inspect_import import commit_import      # inside imports/YYYY-MM-DD_<lab>.py
+    n = commit_import(conn, [(biomarker_id, date, value_str), ...], lab="<laboratory>",
+                      resolved={(biomarker_id, date): "why this value stands"})
+    conn.commit()
+
+commit_import is the one sanctioned way to add results: it screens, refuses to
+write while any SUSPECT row is unacknowledged, requires the laboratory, and skips
+rows already present for the same (biomarker_id, date).
 
     python3 inspect_import.py rows.json           # standalone; rows=[[bid,date,value],...]
     python3 inspect_import.py --self-check
 
-LIMITATION: catches gross scale errors (≥~3–5× off, or a known factor). A unit
-swap that lands in the same magnitude (e.g. a low-but-plausible value) still
-needs clinical judgment — cross-check against sibling markers and the ref range.
+LIMITATION: a unit swap that lands inside the corridor, or a biomarker with
+fewer than 4 prior draws, still needs judgment — cross-check against sibling
+markers and the ref range.
 """
 import argparse, json, re, sys, sqlite3, statistics as st
 from pathlib import Path
@@ -48,9 +54,36 @@ def _known(ratio):
     return None
 
 
-def inspect(conn, rows):
+CORRIDOR_SLACK = 0.25   # fraction beyond the historical min/max before a value is SUSPECT
+CORRIDOR_MIN_N = 4      # prior draws needed for "everything it has ever read" to mean something
+
+
+def outside_corridor(x, hist, slack=CORRIDOR_SLACK):
+    """Reason string when x lies further than `slack` outside the min–max of `hist`
+    (prior numeric values), else None. Catches the plausible-looking outlier the median
+    screen misses: a wrong tube, a new method, a sample that travelled badly."""
+    if len(hist) < CORRIDOR_MIN_N:
+        return None
+    lo, hi = min(hist), max(hist)
+    if hi > 0 and x > hi * (1 + slack):
+        return f"{(x / hi - 1) * 100:.0f}% above the highest of {len(hist)} prior draws ({lo:g}–{hi:g})"
+    if lo > 0 and x < lo * (1 - slack):
+        return f"{(1 - x / lo) * 100:.0f}% below the lowest of {len(hist)} prior draws ({lo:g}–{hi:g})"
+    return None
+
+
+def ensure_lab_column(conn):
+    """Databases created before test_results.lab existed get it here (idempotent)."""
+    if 'lab' not in {r[1] for r in conn.execute("PRAGMA table_info(test_results)")}:
+        conn.execute("ALTER TABLE test_results ADD COLUMN lab TEXT")
+
+
+def inspect(conn, rows, lab=None):
     """rows: iterable of (biomarker_id, date, value). Returns a list of dicts,
-    each with verdict 'OK'|'SUSPECT' and a reason. Non-numeric values pass as OK."""
+    each with verdict 'OK'|'SUSPECT' and a reason. Non-numeric values pass as OK.
+    `lab` (this batch's laboratory) sharpens a corridor flag when it differs from the
+    laboratory of the biomarker's previous result."""
+    ensure_lab_column(conn)
     out = []
     for bid, date, value in rows:
         x = _num(value)
@@ -76,6 +109,13 @@ def inspect(conn, rows):
                     reasons.append(f"{r:.2g}× series median {med:g} "
                                    f"(seen {min(hist):g}–{max(hist):g})"
                                    + (f" — matches {lbl}" if lbl else ""))
+        why = outside_corridor(x, hist) if x > 0 else None   # vs everything it has ever read
+        if why:
+            prev = conn.execute("SELECT lab FROM test_results WHERE biomarker_id=? AND date!=? "
+                                "ORDER BY date DESC LIMIT 1", (bid, date)).fetchone()
+            if lab and prev and prev[0] and prev[0] != lab:    # unknown previous lab: say nothing
+                why += f" — FIRST RESULT FROM A NEW LAB (previous: {prev[0]}): method, units, sample handling?"
+            reasons.append(why)
         if rh is not None and rh > 0 and x > 8 * rh:      # vs reference range
             reasons.append(f"{x / rh:.1f}× ref_high {rh:g}")
         if rl is not None and rl > 0 and 0 < x < rl / 8:
@@ -99,13 +139,38 @@ def report(flags):
     return n
 
 
+def commit_import(conn, rows, lab, resolved=None):
+    """Screen, then insert. `lab` is mandatory (who measured it; add "(shipped sample)" when
+    the tube travelled). Every SUSPECT row must be acknowledged in `resolved` =
+    {(biomarker_id, date): why it is accepted as it stands}; otherwise this raises
+    ValueError and writes nothing. Rows already present for the same (biomarker_id, date)
+    are skipped. Returns the number inserted; the caller commits."""
+    if not (lab or "").strip():
+        raise ValueError("lab is required: name the laboratory (and '(shipped sample)' if it was)")
+    rows, resolved = list(rows), resolved or {}
+    unresolved = [f for f in inspect(conn, rows, lab)
+                  if f['verdict'] == 'SUSPECT' and (f['id'], f['date']) not in resolved]
+    if unresolved:
+        report(unresolved)
+        raise ValueError(f"{len(unresolved)} SUSPECT row(s) unresolved: fix the value/unit, or "
+                         "acknowledge each in resolved={(biomarker_id, date): reason}")
+    n = 0
+    for bid, date, value in rows:
+        n += conn.execute("INSERT OR IGNORE INTO test_results (biomarker_id, date, value, lab) "
+                          "VALUES (?,?,?,?)", (bid, date, str(value), lab)).rowcount
+    return n
+
+
 def _self_check():
     conn = sqlite3.connect(':memory:')
     conn.execute("CREATE TABLE biomarkers(id INT, name_en TEXT, unit TEXT, ref_low REAL, ref_high REAL)")
-    conn.execute("CREATE TABLE test_results(biomarker_id INT, date TEXT, value TEXT)")
-    conn.execute("INSERT INTO biomarkers VALUES(1,'Magnesium','mmol/L',0.7,1.0)")
+    conn.execute("CREATE TABLE test_results(biomarker_id INT, date TEXT, value TEXT, UNIQUE(biomarker_id, date))")
+    # an invented analyte: a fixture never names a real one
+    conn.execute("INSERT INTO biomarkers VALUES(1,'Testium','mmol/L',0.7,1.0)")
     for d, v in [('a', '0.9'), ('b', '0.95'), ('c', '0.88'), ('d', '1.0')]:
         conn.execute("INSERT INTO test_results VALUES(1,?,?)", (d, v))
+    ensure_lab_column(conn)                          # an old database gains the column
+    conn.execute("UPDATE test_results SET lab='Lab A'")
     ok = inspect(conn, [(1, 'e', '0.92')])          # normal → OK
     mgL = inspect(conn, [(1, 'e', '22.1')])          # mmol/L value entered as mg/L (×24.3) → SUSPECT
     dec = inspect(conn, [(1, 'e', '9.0')])           # decimal shift ×10 → SUSPECT
@@ -114,6 +179,24 @@ def _self_check():
     assert mgL[0]['verdict'] == 'SUSPECT' and 'Mg mg/L' in mgL[0]['reason'], mgL
     assert dec[0]['verdict'] == 'SUSPECT', dec
     assert ref[0]['verdict'] == 'SUSPECT', ref
+    # the corridor: 1.3 is only 1.4× the median (the scale screen stays silent) but 30% above
+    # anything on record. A new lab is named when known.
+    cor = inspect(conn, [(1, 'e', '1.3')], lab='Lab B')
+    assert cor[0]['verdict'] == 'SUSPECT' and 'above the highest of 4' in cor[0]['reason'], cor
+    assert 'NEW LAB (previous: Lab A)' in cor[0]['reason'], cor
+    assert inspect(conn, [(1, 'e', '1.2')])[0]['verdict'] == 'OK'      # 20% above: inside the slack
+    assert outside_corridor(5.0, [8.0, 9.0, 7.0]) is None             # <4 draws: no corridor yet
+    # commit_import: refuses without a lab, refuses an unacknowledged SUSPECT, skips duplicates
+    for bad in (dict(lab=''), dict(lab='Lab B')):
+        try:
+            commit_import(conn, [(1, 'e', '1.3')], **bad)
+            raise AssertionError(f"commit_import accepted {bad}")
+        except ValueError:
+            pass
+    assert conn.execute("SELECT count(*) FROM test_results WHERE date='e'").fetchone()[0] == 0
+    assert commit_import(conn, [(1, 'e', '1.3'), (1, 'a', '0.9')], lab='Lab B',
+                         resolved={(1, 'e'): 'repeat draw confirmed'}) == 1   # 'a' already present
+    assert conn.execute("SELECT lab FROM test_results WHERE date='e'").fetchone()[0] == 'Lab B'
     print("self-check OK")
 
 
