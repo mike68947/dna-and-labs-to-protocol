@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """Preventive-screening forward calendar — the "what's due next" tracker.
 
-The per-category `checkup_schedule` columns hold biomarker recheck cadence, but
-there was no consolidated, dated view of procedural screenings (CAC, DEXA,
-colonoscopy, etc.) and no "next due" computation because last-done dates aren't
-in the data. This scaffolds a small `screenings` table you populate, then
-computes overdue / next-due from last_done + cadence.
+The `screenings` table is the ONLY place a cadence lives (the routine and the findings
+quote none): a small table you populate, from which overdue / next-due is computed off
+last_done + cadence. A row may belong to a finding (`issue_id`, set by issues.py --load);
+the plan ranks it by that finding's severity.
 
     python3 screening_calendar.py --init              # create table + seed starter catalog
     python3 screening_calendar.py                     # report: overdue / next due
+    python3 screening_calendar.py --plan              # what needs doing, grouped by the trip that clears it
     python3 screening_calendar.py --set "DEXA" 2025-03-14 "T-score -0.8"
     python3 screening_calendar.py --today 2026-01-01  # pin "today" for testing
     python3 screening_calendar.py --self-check
@@ -21,6 +21,7 @@ and self-update on every import; imaging/procedure rows are recorded with --set.
 import argparse
 import calendar
 import datetime
+import re
 import sqlite3
 import sys
 from pathlib import Path
@@ -73,7 +74,8 @@ CREATE TABLE IF NOT EXISTS screenings (
     last_result TEXT,
     rationale TEXT,
     priority TEXT,                    -- high / medium / low
-    updated_at TEXT
+    updated_at TEXT,
+    issue_id INTEGER                  -- the finding this row belongs to (issues.py owns it)
 )
 """
 
@@ -146,10 +148,11 @@ def set_done(conn, name_query, date_str, result):
     return name
 
 
-def report(conn, today):
+def compute(conn, today):
+    """Every row with its resolved status — the one place the report, the plan, issues.py and
+    the viewer read. Sorted: overdue / never done first (by priority), then soonest due."""
     rows = conn.execute(
-        "SELECT name, domain, cadence_months, last_done, last_result, priority "
-        "FROM screenings"
+        "SELECT name, domain, cadence_months, last_done, last_result, priority FROM screenings"
     ).fetchall()
     derived = derived_dates(conn)
     items = []
@@ -160,11 +163,78 @@ def report(conn, today):
         items.append({"name": name, "domain": domain, "cad": cad, "last_done": last_done,
                       "result": result, "prio": prio, "status": status, "due": due,
                       "derived": name in derived})
-    # Overdue + never-done first (weighted by priority), then soonest due.
     prio_rank = {"high": 0, "medium": 1, "low": 2}
     status_rank = {"OVERDUE": 0, "never done": 1, "not done": 2, "scheduled": 3, "one-time done": 4}
     items.sort(key=lambda r: (status_rank.get(r["status"], 9), prio_rank.get(r["prio"], 9),
-                              r["due"] or datetime.date.max))
+                              r["due"] or datetime.date.max, r["name"]))
+    return items
+
+
+# ── plan: the queue turned into trips ──
+# ponytail: where a row gets done is read off its NAME — first match wins, anything else is a
+# blood draw. Name a new SEED row so a pattern recognises it, or give SEED a `kind` field.
+KINDS = [
+    ("AT HOME", r"blood pressure|at home|home "),
+    ("VISITS", r"referral|consult"),
+    ("IMAGING & PROCEDURES", r"ultrasound|\bMRI\b|\bCT\b|DEXA|echocardiogra|\bECG\b|\(CAC\)|colonoscopy|"
+                             r"endoscopy|mammogra|\bscan\b"),
+    ("VISITS", r"\bexam\b|cleaning|check-?up"),
+    ("URINE", r"urine"),
+    ("STOOL", r"\bstool\b"),
+]
+PLAN_ORDER = ["BLOOD", "URINE", "STOOL", "IMAGING & PROCEDURES", "VISITS", "AT HOME"]
+YEAR_LATE = 365
+
+
+def kind(name):
+    return next((k for k, pat in KINDS if re.search(pat, name, re.I)), "BLOOD")
+
+
+def findings(conn):
+    """{row name: (finding key, title, severity)} for rows linked to a LIVE finding."""
+    try:
+        return {n: (k, t, sev) for n, k, t, sev in conn.execute(
+            "SELECT s.name, i.key, i.title, i.severity FROM screenings s JOIN issues i ON i.id = s.issue_id "
+            "WHERE i.status IN ('open', 'watch')")}
+    except sqlite3.OperationalError:          # a database from before findings existed
+        return {}
+
+
+def plan(conn, today):
+    """The rows that need action, grouped by the trip that clears them → lines. Ranked by the
+    severity of the finding a row belongs to, then its priority, then its due date, then its
+    name. viewer.py draws the same plan in JavaScript (`screeningPlan`): keep the two in step."""
+    finding, rank = findings(conn), {"high": 0, "medium": 1, "low": 2}
+    rows = []
+    for r in compute(conn, today):
+        if r["status"] not in ("OVERDUE", "never done"):
+            continue
+        key, _, sev = finding.get(r["name"], (None, None, 0))
+        rows.append(dict(r, finding=key, sev=sev, kind=kind(r["name"]),
+                         late=(today - r["due"]).days if r["due"] else None))
+    rows.sort(key=lambda r: (-r["sev"], rank.get(r["prio"], 9), r["due"] or datetime.date.max, r["name"]))
+
+    def line(r):
+        when = ("never done" if r["late"] is None else f"{r['late']} d late" if r["late"] < YEAR_LATE
+                else f"{r['late'] / 365:.1f} y late")
+        return f"{r['prio']:<7}{when:<11}{r['name']}" + (f"   [{r['finding']} · sev {r['sev']}]" if r["finding"] else "")
+
+    out = [f"Screening plan (today = {today}) — {len(rows)} row(s) need action", "",
+           "FIRST — by the severity of the finding a row belongs to, then priority, then how late"]
+    out += [f"  {n}. {line(r)}" for n, r in enumerate(rows[:3], 1)]
+    for k in PLAN_ORDER:
+        mine = [r for r in rows if r["kind"] == k]
+        if mine:
+            out += ["", f"{k} — {len(mine)}"] + [f"  {line(r)}" for r in mine]
+    old = sum(1 for r in rows if (r["late"] or 0) >= YEAR_LATE)
+    if old:
+        out += ["", f"{old} row(s) are more than a year late. Do them, or change the cadence / drop the row "
+                    "in SEED: a queue that never empties stops being read."]
+    return out
+
+
+def report(conn, today):
+    items = compute(conn, today)
     mark = {"OVERDUE": "⚠", "never done": "•", "not done": "•", "scheduled": "✓", "one-time done": "✓"}
     print(f"Screening calendar (today = {today})\n")
     print(f"{'':1} {'status':<14}{'next due':<12}{'last done':<12}{'pri':<7}name")
@@ -216,6 +286,16 @@ def self_check():
     init(mem)
     assert mem.execute("SELECT cadence_months, last_done FROM screenings WHERE name = 'Colonoscopy'").fetchone() \
         == (120, '2025-01-01')
+    # the plan: trips read off the names; a row of a live finding ranks first; a year-late row is counted
+    assert [kind(n) for n, *_ in SEED] == ["AT HOME", "BLOOD", "BLOOD", "IMAGING & PROCEDURES", "VISITS", "VISITS",
+                                            "VISITS", "IMAGING & PROCEDURES", "IMAGING & PROCEDURES",
+                                            "IMAGING & PROCEDURES"], [kind(n) for n, *_ in SEED]
+    mem.executescript("""CREATE TABLE issues (id INTEGER PRIMARY KEY, key TEXT, title TEXT, severity INT, status TEXT);
+        INSERT INTO issues VALUES (1, 'testium-high', 'Testium high', 60, 'open');
+        UPDATE screenings SET issue_id = 1 WHERE name = 'Dilated eye exam';""")
+    lines = plan(mem, t)
+    assert lines[3].strip().startswith("1. medium") and "testium-high · sev 60" in lines[3], lines[:5]
+    assert any(ln.startswith("VISITS — ") for ln in lines)
     print("self-check OK")
 
 
@@ -224,6 +304,7 @@ def main():
     ap.add_argument("--init", action="store_true", help="create table + seed starter catalog")
     ap.add_argument("--set", nargs="+", metavar=("NAME DATE", "RESULT"),
                     help="record a completed screening: NAME DATE [RESULT...]")
+    ap.add_argument("--plan", action="store_true", help="what needs doing, grouped by trip")
     ap.add_argument("--today", metavar="YYYY-MM-DD", help="pin 'today' (default: system date)")
     ap.add_argument("--self-check", action="store_true")
     args = ap.parse_args()
@@ -243,7 +324,10 @@ def main():
     # Only report if the table exists (post --init).
     if conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='screenings'").fetchone():
         print()
-        report(conn, today)
+        if args.plan:
+            print("\n".join(plan(conn, today)))
+        else:
+            report(conn, today)
     elif not args.init:
         print("No `screenings` table yet — run `python3 screening_calendar.py --init` first.")
 

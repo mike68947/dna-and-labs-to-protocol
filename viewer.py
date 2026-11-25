@@ -78,7 +78,9 @@ def load_data():
             'FROM screenings ORDER BY name'
         ).fetchall()
         derived = screening_calendar.derived_dates(con)   # same dates the CLI report shows
-        screenings = [(n, d, c, derived[n] if n in derived else ld, lr, p, r)
+        found = screening_calendar.findings(con)          # the plan ranks a row by its finding
+        screenings = [(n, d, c, derived[n] if n in derived else ld, lr, p, r, screening_calendar.kind(n),
+                       found.get(n, (None, None, 0)))
                       for n, d, c, ld, lr, p, r in screenings]
     except sqlite3.OperationalError:   # screenings table not created yet
         pass
@@ -129,10 +131,12 @@ def build_json(categories, biomarkers, bm_cats, results, insights, rsids, protoc
 
     # screenings: [{name, domain, cadence, last, result, prio}]
     scr = [{'name': s[0], 'domain': s[1] or '', 'cadence': s[2], 'last': s[3],
-            'result': s[4] or '', 'prio': s[5] or '', 'rationale': s[6] or ''} for s in screenings]
+            'result': s[4] or '', 'prio': s[5] or '', 'rationale': s[6] or '', 'kind': s[7],
+            'finding': s[8][0], 'ftitle': s[8][1], 'sev': s[8][2]} for s in screenings]
 
     return {'cats': cats, 'bms': bms, 'dates': dates, 'res': res, 'ins': ins,
-            'rs': rs, 'protocol': protocol, 'screenings': scr, 'dob': read_dob()}
+            'rs': rs, 'protocol': protocol, 'screenings': scr, 'plan_order': screening_calendar.PLAN_ORDER,
+            'dob': read_dob()}
 
 
 # DOB drives age-at-draw for age-banded personalized ranges. Lives only in the
@@ -1024,6 +1028,30 @@ function screeningStatus(s, today) {
   return due <= today ? {status: 'OVERDUE', due} : {status: 'scheduled', due};
 }
 
+function screeningPlan(rows, today) {
+  // The rows that need action, grouped by the trip that clears them. Mirrors
+  // screening_calendar.plan(): same rows, same ranking, same groups — keep the two in step.
+  const prioRank = {high: 0, medium: 1, low: 2}, far = new Date(8640000000000000);
+  const plain = (a, b) => a < b ? -1 : a > b ? 1 : 0;      // Python's tie-break: code-point order
+  const todo = rows.filter(r => r.status === 'OVERDUE' || r.status === 'never done')
+    .map(r => ({...r, late: r.due ? Math.round((today - r.due) / 86400000) : null}))
+    .sort((a, b) => (b.sev - a.sev) || (prioRank[a.prio] ?? 9) - (prioRank[b.prio] ?? 9)
+      || ((a.due || far) - (b.due || far)) || plain(a.name, b.name));
+  if (!todo.length) return '';
+  const when = r => r.late == null ? 'never done' : r.late < 365 ? `${r.late} d late` : `${(r.late / 365).toFixed(1)} y late`;
+  const table = list => `<table class="snap-table"><tbody>` + list.map(r =>
+    `<tr><td>${escH(r.prio)}</td><td class="snap-date">${when(r)}</td><td>${escH(r.name)}</td>`
+    + `<td class="pv-meta">${r.finding ? escH(r.ftitle) + ' · severity ' + r.sev : ''}</td></tr>`).join('') + `</tbody></table>`;
+  let html = `<h3 class="pv-h3">First — by the severity of the finding, then priority, then how late</h3>` + table(todo.slice(0, 3));
+  DATA.plan_order.forEach(kind => {
+    const mine = todo.filter(r => r.kind === kind);
+    if (mine.length) html += `<h3 class="pv-h3">${escH(kind)} — ${mine.length}</h3>` + table(mine);
+  });
+  const old = todo.filter(r => r.late >= 365).length;
+  if (old) html += `<p class="pv-note">${old} row(s) are more than a year late. Do them, or change the cadence: a queue that never empties stops being read.</p>`;
+  return `<h2 class="pv-h2">Plan</h2>` + html + `<h2 class="pv-h2">All screenings</h2>`;
+}
+
 function showScreening() {
   activeCat = null;
   renderSidebar(document.getElementById('search-box').value);
@@ -1063,7 +1091,7 @@ function showScreening() {
   // Format from LOCAL components — toISOString() would shift the day in +UTC zones.
   const pad = n => String(n).padStart(2, '0');
   const iso = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-  let html = `<div class="protocol-text" style="padding:8px 4px 40px;">`
+  let html = `<div class="protocol-text" style="padding:8px 4px 40px;">` + screeningPlan(rows, today)
     + `<p style="color:var(--muted);font-size:12px;margin-bottom:14px;">`
     + `${rows.length} screenings · <b>${actionable}</b> need action (overdue or never done). `
     + `Cadences are starter defaults — record completions with `
@@ -1322,7 +1350,8 @@ def self_check():
     assert 'cdn.jsdelivr' not in HTML_TEMPLATE
     assert load_chart_js().startswith('/*!')                      # vendored asset present, no </script
     # the Protocol page renders findings and the routine; the category panel has no prescription tab
-    for frag in ('function pvFinding(i)', 'function pvRoutineSection(sec)', 'DATA.protocol'):
+    for frag in ('function pvFinding(i)', 'function pvRoutineSection(sec)', 'DATA.protocol',
+                 'function screeningPlan(rows, today)'):
         assert frag in HTML_TEMPLATE, frag
     assert 'pane-protocol' not in HTML_TEMPLATE and 'DATA.unified' not in HTML_TEMPLATE
     # censored values: a bound is not a measurement — status is bound-aware, the fit skips them,

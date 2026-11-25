@@ -54,7 +54,8 @@ python3 init_db.py --backup      # labs.db is the only copy of the user's data
 2. If a finding's prescription changes, write it with `issues.py --action / --drop-action
    … --why`, and give a new take / conditional its dose in the routine (the
    `regenerate-unified-protocol` skill) in the same change.
-3. `python3 viewer.py && python3 check_all.py` — the import is not done while the gate is red.
+3. `python3 screening_calendar.py --plan` — what this import cleared, and what is still due.
+4. `python3 viewer.py && python3 check_all.py` — the import is not done while the gate is red.
    Its stale-insight report lists the category narratives that now lag the new labs.
 
 ## 4. Report to the user
