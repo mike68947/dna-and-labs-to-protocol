@@ -7,8 +7,8 @@ Two classes of check, deliberately kept apart:
   CONSISTENCY — two layers disagree about the same fact, or the database breaks a
   structural invariant. A defect; it gates (exit 1) until reconciled.
 
-  REPORTS — a work queue: insights older than the labs they describe, generated files
-  older than labs.db. Informational, never gates. Staleness is almost never empty, so
+  REPORTS — a work queue: findings off target, insights older than the labs they describe,
+  generated files and backups older than labs.db. Informational, never gates. Staleness is almost never empty, so
   gating on it would only train the habit of ignoring the gate.
 
 Keep that split when adding a check. A blocking channel that cries wolf gets overridden,
@@ -27,7 +27,7 @@ ROOT = Path(__file__).parent
 DB = ROOT / "labs.db"
 
 SELF_CHECKS = ["init_db.py", "inspect_import.py", "import_dna.py", "lookup_variant.py", "check_variants.py",
-               "seed_ref_ranges.py",
+               "issues.py", "protocol_view.py", "rcv.py", "seed_ref_ranges.py",
                "screening_calendar.py", "export_for_llm.py", "viewer.py"]
 # generated from labs.db; warn when older than it (or, for the viewer, missing)
 ARTIFACTS = ["viewer.html", "master_protocol.md", "labs_export.md", "labs_summary.md"]
@@ -151,6 +151,20 @@ def main():
     bad = db_invariants(con)
     print("\n".join(bad) if bad else "OK — no orphans, no future-dated results")
 
+    import issues
+    import protocol_view
+    from init_db import migrate
+    migrate(con)
+    print("\n── findings: every score, status and action has its reason [CONSISTENCY] ──")
+    ibad = issues.check(con)
+    print("\n".join(ibad) if ibad else "OK — every finding, score and action has its reason on file")
+    bad += ibad
+
+    print("\n── routine vs the findings' prescriptions (ROUTINE, ACT1–3, VALUES) [CONSISTENCY] ──")
+    rbad = protocol_view.check_routine(con)
+    print("\n".join(rbad) if rbad else "OK — every prescribed item has its dose, nothing unprescribed is dosed")
+    bad += rbad
+
     import check_variants as CV
     print("\n── variants: direction in prose, promoted rows vs genome [CONSISTENCY] ──")
     vbad = [f"{w}: {r} {what} written up as carried — \"{s}\"" for w, r, what, s in CV.carried_claims(con)]
@@ -160,6 +174,9 @@ def main():
     for u in unread:
         print(f"  (report) {u}")
     bad += vbad
+
+    print("\n── findings [report] ──")
+    issues.report(con)
 
     print("\n── stale insights vs labs [report] ──")
     st = stale_insights(con)

@@ -32,6 +32,7 @@ import argparse, json, re, sys, sqlite3, statistics as st
 from pathlib import Path
 
 from init_db import migrate
+from rcv import load as load_cvi, rcv
 
 # known conversion ratios (>1) → human label, to name a suspected mismatch
 FACTORS = {
@@ -56,20 +57,32 @@ def _known(ratio):
     return None
 
 
-CORRIDOR_SLACK = 0.25   # fraction beyond the historical min/max before a value is SUSPECT
+CORRIDOR_SLACK = 0.25   # fraction beyond the historical min/max before a value is SUSPECT, for an
+                        # analyte with no noise floor on file (rcv.py)
+CORRIDOR_FLOOR = 0.10   # the least slack any analyte gets: a change of analyzer alone moves a tight one
 CORRIDOR_MIN_N = 4      # prior draws needed for "everything it has ever read" to mean something
 
 
-def outside_corridor(x, hist, slack=CORRIDOR_SLACK):
-    """Reason string when x lies further than `slack` outside the min–max of `hist`
-    (prior numeric values), else None. Catches the plausible-looking outlier the median
+def corridor_slack(cvi):
+    """(down, up): the analyte's reference change value (rcv.py) when its CV_I is on file, never
+    tighter than CORRIDOR_FLOOR; else a flat CORRIDOR_SLACK."""
+    if not cvi:
+        return CORRIDOR_SLACK, CORRIDOR_SLACK
+    down, up = rcv(cvi)
+    return max(down, CORRIDOR_FLOOR), max(up, CORRIDOR_FLOOR)
+
+
+def outside_corridor(x, hist, cvi=None):
+    """Reason string when x lies further outside the min–max of `hist` (prior numeric values)
+    than the analyte's slack, else None. Catches the plausible-looking outlier the median
     screen misses: a wrong tube, a new method, a sample that travelled badly."""
     if len(hist) < CORRIDOR_MIN_N:
         return None
     lo, hi = min(hist), max(hist)
-    if hi > 0 and x > hi * (1 + slack):
+    down, up = corridor_slack(cvi)
+    if hi > 0 and x > hi * (1 + up):
         return f"{(x / hi - 1) * 100:.0f}% above the highest of {len(hist)} prior draws ({lo:g}–{hi:g})"
-    if lo > 0 and x < lo * (1 - slack):
+    if lo > 0 and x < lo * (1 - down):
         return f"{(1 - x / lo) * 100:.0f}% below the lowest of {len(hist)} prior draws ({lo:g}–{hi:g})"
     return None
 
@@ -80,6 +93,7 @@ def inspect(conn, rows, lab=None):
     `lab` (this batch's laboratory) sharpens a corridor flag when it differs from the
     laboratory of the biomarker's previous result."""
     migrate(conn)                       # a database from before test_results.lab gains it
+    cvi_of = load_cvi(conn)
     out = []
     for bid, date, value in rows:
         x = _num(value)
@@ -105,7 +119,7 @@ def inspect(conn, rows, lab=None):
                     reasons.append(f"{r:.2g}× series median {med:g} "
                                    f"(seen {min(hist):g}–{max(hist):g})"
                                    + (f" — matches {lbl}" if lbl else ""))
-        why = outside_corridor(x, hist) if x > 0 else None   # vs everything it has ever read
+        why = outside_corridor(x, hist, cvi_of.get(bid)) if x > 0 else None   # vs everything it has read
         if why:
             prev = conn.execute("SELECT lab FROM test_results WHERE biomarker_id=? AND date!=? "
                                 "ORDER BY date DESC LIMIT 1", (bid, date)).fetchone()
@@ -182,6 +196,12 @@ def _self_check():
     assert 'NEW LAB (previous: Lab A)' in cor[0]['reason'], cor
     assert inspect(conn, [(1, 'e', '1.2')])[0]['verdict'] == 'OK'      # 20% above: inside the slack
     assert outside_corridor(5.0, [8.0, 9.0, 7.0]) is None             # <4 draws: no corridor yet
+    # per-analyte slack: a noisy analyte (CV_I 25%) may sit 60% above its history, a tight one (CV_I 1%)
+    # may not sit 15% above — and no analyte gets less than CORRIDOR_FLOOR
+    quiet = [10.0, 11.0, 9.0, 10.5]
+    assert outside_corridor(17.6, quiet, cvi=25.0) is None and outside_corridor(17.6, quiet) is not None
+    assert outside_corridor(12.7, quiet, cvi=1.0) is not None and outside_corridor(12.7, quiet) is None
+    assert outside_corridor(11.9, quiet, cvi=1.0) is None             # +8%: inside the 10% floor
     # commit_import: refuses without a lab, refuses an unacknowledged SUSPECT, skips duplicates
     for bad in (dict(lab=''), dict(lab='Lab B')):
         try:

@@ -1,37 +1,36 @@
 ---
 name: regenerate-category
-description: Rewrite one category_insights row in labs.db — refresh the `insight` against the latest labs, variants, and stack, fill the 5 structured protocol columns (supplements/diet/activity/lifestyle/checkup_schedule), and add `concordance` for genomically-loaded categories. Use when a category has drifted or the user asks to regenerate it.
+description: Rewrite one category's assessment in labs.db (category_insights) — the narrative read of its labs, what the person's variants add, and the concordance table (do the labs confirm the genetic prediction?). Use when check_all reports a category's insight older than its labs, or the user asks to refresh a category. Not for prescriptions: those live on findings (issues.py).
 ---
 
-# Regenerate a category insight
+# Regenerate a category assessment
 
-Rewrite a single `category_insights` row grounded in the person's real data.
+A category row is background: what the labs and variants of one panel say. It prescribes
+nothing — a problem worth acting on becomes a finding (`issues.py --load`) with its own
+targets and actions, and doses live in the routine.
 
 ## Steps
 
-1. **Gather inputs** for the target category id:
+0. **Back up**: `python3 init_db.py --backup`.
+1. **Gather** for the category id:
    ```sql
-   -- current row
    SELECT * FROM category_insights WHERE category_id = :id;
-   -- biomarker trajectory (every value, oldest→newest)
-   SELECT b.name_en, t.date, t.value FROM biomarkers b
+   SELECT b.name_en, b.unit, t.date, t.value, t.lab FROM biomarkers b
      JOIN biomarker_categories bc ON bc.biomarker_id = b.id
      JOIN test_results t ON t.biomarker_id = b.id
      WHERE bc.category_id = :id ORDER BY b.name_en, t.date;
-   -- variants in this category
-   SELECT rsid, gene, genotype, zygosity, relevance FROM variants WHERE category_id = :id;
+   SELECT rsid, gene, genotype, zygosity, effect_allele, effect_copies, relevance
+     FROM variants WHERE category_id = :id;
    ```
-   Also skim `unified_protocol.protocol` for anything this category touches.
-
-2. **Write the columns** (see CLAUDE.md → "Authoring category_insights"):
-   - `insight` (required) grounded in the actual trajectory + latest values.
-   - `insight_dna` if variants are present.
-   - the 5 protocol domains for items actually in use.
-   - `concordance` (`mechanism|predicted|observed|verdict`, bare verdict keyword) when the
-     category is genomically loaded — does the lab evidence confirm the genetic prediction?
-
-3. **Commit**: `UPDATE category_insights SET ... , updated_at = date('now') WHERE category_id = :id;`
-   (Back up first: `python3 init_db.py --backup` — labs.db is git-ignored, so git is no backup.)
-
-4. **Reconcile + rebuild**: if a supplement/dose/rule changed, grep `unified_protocol` for it
-   and update that too. Then `python3 viewer.py`.
+   and `python3 issues.py` for the findings in this category.
+2. **Write**:
+   - `insight` (required) — the trajectory and what it means, grounded in the actual values.
+   - `insight_dna` — what the variants add. Read direction from `effect_copies` (0 / 1 / 2;
+     NULL = unknown), never from the zygosity word; with 0 copies, say the risk allele is absent.
+   - `concordance` for a genomically loaded category: one row per line,
+     `mechanism|predicted|observed|verdict`, verdict a bare keyword (CONFIRMS / PARTIAL /
+     UNRESOLVED / CONTRADICTS / FAVORABLE).
+   No prescriptions here. If the read shows a new problem, propose a finding instead.
+3. **Commit**: `UPDATE category_insights SET insight=…, insight_dna=…, concordance=…,
+   updated_at=date('now') WHERE category_id=:id` (INSERT if the row is missing).
+4. `python3 viewer.py && python3 check_all.py`.

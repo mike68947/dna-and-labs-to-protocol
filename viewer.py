@@ -8,6 +8,8 @@ import sqlite3
 import sys
 from pathlib import Path
 
+import issues               # findings with their computed state
+import protocol_view        # findings by category + the daily routine
 import screening_calendar   # DERIVED_FROM / derived_dates: lab-backed screening dates
 
 os.umask(0o077)  # viewer.html / master_protocol.md hold your whole dataset — keep them owner-only
@@ -22,27 +24,6 @@ PROTOCOL_OUT = Path('master_protocol.md')
 # Inlining also makes the viewer genuinely self-contained: no network at view time.
 # Upgrade deliberately: re-download a pinned build into vendor/ and re-run.
 CHART_JS = Path(__file__).resolve().parent / 'vendor' / 'chart.umd.min.js'
-
-DOMAIN_HEADINGS = [
-    ('supplements',      '═══ SUPPLEMENTS ═══'),
-    ('diet',             '═══ DIET ═══'),
-    ('activity',         '═══ ACTIVITY ═══'),
-    ('lifestyle',        '═══ LIFESTYLE ═══'),
-    ('checkup_schedule', '═══ CHECKUP SCHEDULE ═══'),
-]
-
-
-def compose_protocol(supplements, diet, activity, lifestyle, checkups):
-    """Concatenate non-null domain fields with ═══ headers. Returns None if all empty."""
-    parts = []
-    values = {'supplements': supplements, 'diet': diet, 'activity': activity,
-              'lifestyle': lifestyle, 'checkup_schedule': checkups}
-    for key, heading in DOMAIN_HEADINGS:
-        v = values[key]
-        if v and v.strip():
-            parts.append(f'{heading}\n\n{v.strip()}')
-    return '\n\n'.join(parts) if parts else None
-
 
 def load_data():
     con = sqlite3.connect(DB)
@@ -68,21 +49,11 @@ def load_data():
         'SELECT biomarker_id, date, value FROM test_results ORDER BY date'
     ).fetchall()
 
-    # Insights — the protocol is composed from the structured domain columns
-    # (supplements/diet/activity/lifestyle/checkup_schedule).
+    # Category assessments (background; the prescription lives in the findings)
     insights = {}
-    for row in cur.execute(
-        'SELECT category_id, insight, insight_dna, '
-        'supplements, diet, activity, lifestyle, checkup_schedule, concordance '
-        'FROM category_insights'
-    ):
-        (cid, text, dna, supplements, diet,
-         activity, lifestyle, checkups, concordance) = row
-        protocol = compose_protocol(supplements, diet, activity, lifestyle, checkups)
-        insights[cid] = {
-            'text': text, 'dna': dna,
-            'protocol': protocol, 'concordance': concordance,
-        }
+    for cid, text, dna, concordance in cur.execute(
+            'SELECT category_id, insight, insight_dna, concordance FROM category_insights'):
+        insights[cid] = {'text': text, 'dna': dna, 'concordance': concordance}
 
     # variants (genotypes matched from the user's DNA file by import_dna.py)
     rsids = {}  # category_id → [{rsid, gene, relevance, genotype, zygosity, effect}, ...]
@@ -95,14 +66,9 @@ def load_data():
             'gt': row[4] or '', 'zyg': row[5] or '', 'ea': row[6], 'ec': row[7],
         })
 
-    # Unified protocol
-    unified = ''
-    try:
-        row = cur.execute('SELECT protocol FROM unified_protocol ORDER BY id DESC LIMIT 1').fetchone()
-        if row:
-            unified = row[0]
-    except sqlite3.OperationalError:   # table missing on a fresh --empty db
-        pass
+    # The protocol: findings (state computed now) grouped by category, then the daily routine
+    protocol = {'view': protocol_view.build_protocol_view(issues.view(con), {c[0]: c[1] for c in categories}),
+                'routine': protocol_view.routine_data(con)}
 
     # Screening calendar (table may not exist if screening_calendar.py --init hasn't run)
     screenings = []
@@ -118,10 +84,10 @@ def load_data():
         pass
 
     con.close()
-    return categories, biomarkers, bm_cats, results, insights, rsids, unified, screenings
+    return categories, biomarkers, bm_cats, results, insights, rsids, protocol, screenings
 
 
-def build_json(categories, biomarkers, bm_cats, results, insights, rsids, unified, screenings):
+def build_json(categories, biomarkers, bm_cats, results, insights, rsids, protocol, screenings):
     cats = [{'id': c[0], 'en': c[1], 'ru': c[2]} for c in categories]
 
     bms = []
@@ -166,7 +132,7 @@ def build_json(categories, biomarkers, bm_cats, results, insights, rsids, unifie
             'result': s[4] or '', 'prio': s[5] or '', 'rationale': s[6] or ''} for s in screenings]
 
     return {'cats': cats, 'bms': bms, 'dates': dates, 'res': res, 'ins': ins,
-            'rs': rs, 'unified': unified, 'screenings': scr, 'dob': read_dob()}
+            'rs': rs, 'protocol': protocol, 'screenings': scr, 'dob': read_dob()}
 
 
 # DOB drives age-at-draw for age-banded personalized ranges. Lives only in the
@@ -305,6 +271,27 @@ body { background: var(--bg); color: var(--text); font: 13px/1.4 'Inter', system
   border-bottom: 1px solid var(--border); padding-bottom: 4px; margin-bottom: 8px;
 }
 
+/* ── Protocol page ── */
+.pv { max-width: 900px; padding-bottom: 40px; }
+.pv-h2 { font-size: 16px; color: var(--accent); margin: 18px 0 8px; }
+.pv-h3 { font-size: 12px; color: var(--accent2); margin: 12px 0 4px; }
+.pv-intro, .pv-note { color: var(--muted); font-size: 12px; line-height: 1.6; margin: 6px 0; }
+.pv-pre { white-space: pre-line; }
+.pv-group { border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; margin: 8px 0; }
+.pv-group > summary { cursor: pointer; font-weight: 600; }
+.pv-finding { border-top: 1px solid var(--border); padding: 10px 0; line-height: 1.6; }
+.pv-finding.closed { opacity: .6; }
+.pv-list { list-style: none; padding-left: 0; margin: 4px 0; }
+.pv-list li { margin: 3px 0; }
+.pv-state { display: inline-block; min-width: 92px; margin-right: 8px; font-size: 11px; color: var(--muted); }
+.pv-state.good { color: #2ecc71; }
+.pv-state.warn { color: #f39c12; }
+.pv-state.bad { color: #e74c3c; }
+.pv-meta { color: var(--muted); font-size: 11px; font-weight: 400; }
+.pv-why { display: block; margin-left: 100px; color: var(--muted); font-size: 11px; }
+.pv-history summary { cursor: pointer; color: var(--muted); font-size: 11px; }
+.pv a { color: var(--accent); }
+
 /* ── Personalized-range status dot (age/sex/genetics) ── */
 .snap-range { white-space: nowrap; cursor: help; }
 .rng-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%;
@@ -440,7 +427,7 @@ td.col-date:not(.has-val) { color: var(--border); }
   </div>
   <button id="longevity-btn" onclick="showLongevity()">🧬 Longevity Dashboard</button>
   <button id="screening-btn" onclick="showScreening()">🩺 Screening Calendar</button>
-  <button id="unified-btn" onclick="showUnified()">Unified Protocol</button>
+  <button id="unified-btn" onclick="showUnified()">📋 Protocol</button>
   <div id="cat-list"></div>
 </div>
 
@@ -620,25 +607,15 @@ function renderInsights(catId) {
   const panel = document.getElementById('insights-panel');
   const insObj = DATA.ins[String(catId)] || {};
   const rsids = DATA.rs[String(catId)] || [];
-  const hasProtocol = insObj.protocol;
   const found = rsids.filter(r => r.gt).length;
 
-  // Tabs: Assessment (combined) | Protocol (conditional) | Variants
+  // Tabs: Assessment (findings + background) | Variants. The prescription is on the Protocol page.
   let tabs = `<div class="insight-tabs">`;
   tabs += `<button class="insight-tab active" onclick="switchInsightTab(this,'pane-assess')">Assessment</button>`;
-  if (hasProtocol) tabs += `<button class="insight-tab has-content" onclick="switchInsightTab(this,'pane-protocol')">Protocol</button>`;
   tabs += `<button class="insight-tab" onclick="switchInsightTab(this,'pane-variants')">Variants (${found}/${rsids.length})</button>`;
   tabs += `</div>`;
 
   const paneAssess = buildAssessmentPane(catId, insObj, rsids);
-
-  // Protocol pane (unchanged)
-  let paneProtocol = '';
-  if (hasProtocol) {
-    let protocolHtml = escH(insObj.protocol);
-    protocolHtml = protocolHtml.replace(/^(═+\s*.+?\s*═+)$/gm, '<span class="section-header">$1</span>');
-    paneProtocol = `<div class="insight-pane" id="pane-protocol"><div class="protocol-text">${protocolHtml}</div></div>`;
-  }
 
   // Variants pane (unchanged — full per-rsID detail)
   let paneVariants = `<div class="insight-pane" id="pane-variants">`;
@@ -658,7 +635,7 @@ function renderInsights(catId) {
   }
   paneVariants += `</div>`;
 
-  panel.innerHTML = tabs + paneAssess + paneProtocol + paneVariants;
+  panel.innerHTML = tabs + paneAssess + paneVariants;
   panel.classList.add('visible');
 }
 
@@ -666,6 +643,8 @@ function renderInsights(catId) {
 function buildAssessmentPane(catId, insObj, rsids) {
   const bms = catBms[catId] || [];
   let html = `<div class="insight-pane active" id="pane-assess">`;
+  const findings = buildCategoryFindings(catId);
+  html += findings;
   html += buildLabSnapshot(bms);
   html += buildVariantBurden(rsids);
   if (insObj.concordance) html += buildConcordance(insObj.concordance);
@@ -677,7 +656,7 @@ function buildAssessmentPane(catId, insObj, rsids) {
     html += `<div class="assess-section"><h3 class="assess-h">DNA-enriched detail</h3>`
          +  `<div class="assess-narrative">${escH(insObj.dna)}</div></div>`;
   }
-  if (!bms.length && !rsids.length && !insObj.concordance && !insObj.text && !insObj.dna) {
+  if (!findings && !bms.length && !rsids.length && !insObj.concordance && !insObj.text && !insObj.dna) {
     html += `<div class="no-insight">No assessment available for this category.</div>`;
   }
   html += `</div>`;
@@ -809,31 +788,95 @@ function switchInsightTab(btn, paneId) {
   document.getElementById(paneId).classList.add('active');
 }
 
+// ── Protocol page: findings (computed state + prescription), then the daily routine ──
+const PV_TONE = {worsening: 'bad', 'off target': 'warn', 'not moving': 'warn', flat: 'warn',
+                 improving: 'good', 'on target': 'good'};
+const PV_KINDS = [['take', 'Take'], ['conditional', 'If triggered'], ['avoid', 'Avoid'], ['diet', 'Diet'],
+                  ['activity', 'Activity'], ['lifestyle', 'Lifestyle'], ['refer', 'Refer / tell']];
+
+function buildCategoryFindings(catId) {
+  const g = DATA.protocol.view.groups.find(g => String(g.id) === String(catId));
+  if (!g) return '';
+  return `<div class="assess-section"><h3 class="assess-h">Findings</h3><ul class="pv-list">`
+    + g.issues.map(i => `<li><span class="pv-state ${PV_TONE[i.state] || ''}">${escH(i.state)}</span>${escH(i.title)}`
+      + ` <span class="pv-meta">severity ${i.severity} · ${escH(i.status)}</span></li>`).join('')
+    + `</ul><p class="pv-meta">What is prescribed for each is on the Protocol page.</p></div>`;
+}
+
+function pvFinding(i) {
+  const live = i.status === 'open' || i.status === 'watch';
+  const markers = i.markers.map(m => {
+    const val = m.latest == null ? 'never measured' : `${escH(m.text)}${m.unit ? ' ' + escH(m.unit) : ''}, ${escH(m.date)}`;
+    const notes = (m.target ? ` · target ${escH(m.target)}` : '') + (m.stale ? ' · stale' : '')
+      + (m.within_noise ? ' · within noise' : '') + (m.no_trend && m.no_trend !== 'stale' ? ' · ' + escH(m.no_trend) : '')
+      + (m.target && !m.floor ? ' · no noise floor on file' : '');
+    return `<li><span class="pv-state ${live ? PV_TONE[m.state] || '' : ''}">${escH(m.state)}</span>${escH(m.name)}: ${val}${notes}</li>`;
+  }).join('');
+  const rx = PV_KINDS.flatMap(([k, label]) => i.prescribed.filter(p => p.kind === k).map(p =>
+    `<li><span class="pv-state ${k === 'avoid' ? 'bad' : ''}">${label}</span>${escH(p.name)}`
+    + `${p.detail ? ' — ' + escH(p.detail) : ''}<span class="pv-why">${escH(p.why)}</span></li>`)).join('');
+  const due = i.screenings.filter(s => /^(due|OVERDUE|never done)$/.test(s.status)).map(s => escH(s.name)).join(' · ');
+  const hist = i.events.slice().reverse().map(e =>
+    `<li><span class="pv-state">${escH(e.date)}</span>${escH(e.kind)} — ${escH(e.why)}</li>`).join('');
+  return `<div class="pv-finding${live ? '' : ' closed'}" id="finding-${escH(i.key)}">
+    <p><strong>${escH(i.title)}</strong> <span class="pv-meta">severity ${i.severity} · confidence ${i.confidence ?? '–'}
+      · ${escH(i.status)}${live ? ` · <span class="pv-state ${PV_TONE[i.state] || ''}">${escH(i.state)}</span>` : ''}</span></p>
+    <p>${escH(i.summary)}</p>
+    ${markers ? `<ul class="pv-list">${markers}</ul>` : ''}
+    ${i.done_when ? `<p class="pv-note"><b>Done when:</b> ${escH(i.done_when)}</p>` : ''}
+    ${live && rx ? `<p class="pv-note"><b>Prescribed:</b></p><ul class="pv-list">${rx}</ul>` : ''}
+    ${live && due ? `<p class="pv-note"><b>To do:</b> ${due}</p>` : ''}
+    ${hist ? `<details class="pv-history"><summary>History (${i.events.length})</summary><ul class="pv-list">${hist}</ul></details>` : ''}
+  </div>`;
+}
+
+function pvRoutineSection(sec) {
+  // the routine's own text (a SCHEDULE bullet links to the findings that prescribe it), then what
+  // the live findings add to the section
+  const links = DATA.protocol.routine.links || {};
+  const link = x => `<a href="#finding-${escH(x.key)}">${escH(x.title)}</a>`;
+  const body = sec.body.split('\n').map(ln => {
+    const m = sec.title === 'SCHEDULE' && ln.match(/^• (.+?) — /), to = m ? links[m[1].trim()] || [] : [];
+    return escH(ln) + (to.length ? ` <span class="pv-meta">→ ${to.map(link).join(' · ')}</span>` : '');
+  }).join('\n');
+  const seen = new Set();
+  const rules = sec.rules.filter(r => (sec.title !== 'SCHEDULE' || r.kind === 'avoid')
+    && !seen.has(r.kind + r.name) && seen.add(r.kind + r.name));
+  const extra = rules.length ? `<h3 class="pv-h3">${sec.title === 'SCHEDULE' ? 'Do not take' : 'From the findings'}</h3>`
+    + `<ul class="pv-list">${rules.map(r => `<li>${escH(r.name)}${r.detail ? ' — ' + escH(r.detail) : ''}`
+      + ` <span class="pv-meta">${link({key: r.key, title: r.issue})}</span></li>`).join('')}</ul>` : '';
+  return `<details class="pv-group" open><summary>${sec.n}. ${escH(sec.title)}</summary>`
+    + `<div class="protocol-text">${body}</div>${extra}</details>`;
+}
+
 function showUnified() {
-  if (!DATA.unified) return;
-  // Deselect category
   activeCat = null;
   renderSidebar(document.getElementById('search-box').value);
   document.getElementById('longevity-btn').classList.remove('active');
   document.getElementById('screening-btn').classList.remove('active');
   document.getElementById('unified-btn').classList.add('active');
-  document.getElementById('cat-title').textContent = 'Unified Master Protocol';
-  document.getElementById('view-toggle').style.display = 'none';
-  document.getElementById('table-wrap').style.display = 'none';
-  document.getElementById('bm-search').style.display = 'none';
-  document.getElementById('row-count').style.display = 'none';
-  document.getElementById('data-table').style.display = 'none';
-  document.getElementById('empty-state').style.display = 'none';
-
-  let html = escH(DATA.unified);
-  // Style section headers (═══ lines)
-  html = html.replace(/^(═+\s*.+?\s*═+)$/gm, '<span class="section-header">$1</span>');
-  // Style sub-headers (─── lines)
-  html = html.replace(/^(─+\s*.+?\s*─+)$/gm, '<span style="color:var(--accent2);font-weight:600;font-size:13px;display:block;margin-top:16px;">$1</span>');
-
+  document.getElementById('cat-title').textContent = 'Protocol';
+  ['view-toggle', 'table-wrap', 'bm-search', 'row-count', 'data-table', 'empty-state']
+    .forEach(id => { document.getElementById(id).style.display = 'none'; });
+  const pv = DATA.protocol, r = pv.routine;
+  let html = `<div class="pv"><h2 class="pv-h2">Findings</h2><p class="pv-intro">Each finding carries its own
+    prescription — what to take, avoid or change, and why — and its exit criterion. Most severe first. Severity is how
+    much harm a finding could do if left unmanaged; confidence is how firmly your own results establish it (0–100, an
+    editorial reading, not a clinical score). Whether a marker is on target, and which way it moved, is worked out from
+    your results each time this page is built: a direction needs two comparable draws (same laboratory, at most 400
+    days apart, the latest not stale).</p>`;
+  html += pv.view.groups.length ? pv.view.groups.map(g => `<details class="pv-group" open><summary>${escH(g.title)}
+      <span class="pv-meta">severity ${g.severity} · ${g.issues.length} finding${g.issues.length === 1 ? '' : 's'}</span></summary>
+      ${g.issues.map(pvFinding).join('')}</details>`).join('')
+    : '<p class="no-insight">No findings yet — see CLAUDE.md (python3 issues.py --load).</p>';
+  html += `<h2 class="pv-h2">Daily routine</h2>`;
+  if (!r) html += '<p class="no-insight">No routine yet — see the regenerate-unified-protocol skill.</p>';
+  else if (r.error) html += `<p class="no-insight">The routine does not parse: ${escH(r.error)}</p><div class="protocol-text">${escH(r.text)}</div>`;
+  else html += `<p class="pv-intro pv-pre">${escH(r.preamble)}</p>` + r.sections.map(pvRoutineSection).join('');
   const panel = document.getElementById('insights-panel');
-  panel.innerHTML = '<div class="protocol-text" style="padding-bottom:40px;">' + html + '</div>';
+  panel.innerHTML = html + '</div>';
   panel.classList.add('visible');
+  panel.scrollTop = 0;
 }
 
 // ── Longevity dashboard ──────────────────────────────────────────────────────
@@ -1278,10 +1321,10 @@ def self_check():
     assert page.count('<script') == n_tags and page.count('</script') == n_tags, 'payload injected a tag'
     assert 'cdn.jsdelivr' not in HTML_TEMPLATE
     assert load_chart_js().startswith('/*!')                      # vendored asset present, no </script
-    # compose_protocol: non-null domain columns win, all-empty falls back to None
-    assert compose_protocol(None, None, None, None, None) is None
-    assert '═══ DIET ═══' in compose_protocol(None, 'eat well', None, None, None)
-    assert compose_protocol('  ', '', None, None, None) is None
+    # the Protocol page renders findings and the routine; the category panel has no prescription tab
+    for frag in ('function pvFinding(i)', 'function pvRoutineSection(sec)', 'DATA.protocol'):
+        assert frag in HTML_TEMPLATE, frag
+    assert 'pane-protocol' not in HTML_TEMPLATE and 'DATA.unified' not in HTML_TEMPLATE
     # censored values: a bound is not a measurement — status is bound-aware, the fit skips them,
     # the chart keeps them (hollow) and the tooltip shows the raw string; no raw parseFloat on values
     for frag in ('function qualOf(v)', 'function boundStatus(raw, lo, hi)', '.filter(p => !qualOf(p.value))',
@@ -1304,17 +1347,15 @@ def main():
     chart_js = load_chart_js()
 
     print('Loading data...')
-    categories, biomarkers, bm_cats, results, insights, rsids, unified, screenings = load_data()
-    data = build_json(categories, biomarkers, bm_cats, results, insights, rsids, unified, screenings)
+    categories, biomarkers, bm_cats, results, insights, rsids, protocol, screenings = load_data()
+    data = build_json(categories, biomarkers, bm_cats, results, insights, rsids, protocol, screenings)
 
     OUT.write_text(render(data, chart_js), encoding='utf-8')
 
-    # Export unified protocol to markdown
-    if unified:
-        con = sqlite3.connect(DB)
-        ts = con.execute('SELECT updated_at FROM unified_protocol ORDER BY id DESC LIMIT 1').fetchone()[0]
-        con.close()
-        md = f'# Unified Master Protocol\n\n_Last updated: {ts}_\n\n```\n{unified}\n```\n'
+    # The protocol as markdown: live findings with their prescriptions, then the routine
+    if protocol['view']['groups'] or protocol['routine']:
+        import time
+        md = protocol_view.protocol_md(protocol['view'], protocol['routine'], time.strftime('%Y-%m-%d %H:%M'))
         PROTOCOL_OUT.write_text(md, encoding='utf-8')
         print(f'  → {PROTOCOL_OUT} ({len(md)} chars)')
 

@@ -46,8 +46,7 @@ def backup(db=DB, out_dir=BACKUPS, keep=KEEP):
         old.unlink()
     return gz
 
-INSIGHT_COLS = ["category_id", "insight", "insight_dna", "supplements", "diet",
-                "activity", "lifestyle", "checkup_schedule", "concordance"]
+INSIGHT_COLS = ["category_id", "insight", "insight_dna", "concordance"]
 
 
 def migrate(conn):
@@ -138,6 +137,9 @@ def main():
         applied, _ = seed_ref_ranges.apply(conn)  # fills ref_low/ref_high from data/ref_ranges.json
 
     n_screen = screening_calendar.init(conn)      # seeds the starter screening calendar (both modes)
+    if not empty and seed.get("issues"):          # findings last: they link to calendar rows
+        import issues
+        issues.load(conn, seed["issues"])
     conn.commit()
 
     ncat = conn.execute("SELECT COUNT(*) FROM categories").fetchone()[0]

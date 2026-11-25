@@ -37,6 +37,14 @@ def prose(conn):
     for cid, *cols in conn.execute("SELECT category_id, insight, insight_dna, concordance FROM category_insights"):
         out += [(f"category {cid}", t) for t in cols if t]
     out += [("routine", t) for (t,) in conn.execute("SELECT protocol FROM unified_protocol") if t]
+    try:
+        for key, *cols in conn.execute("SELECT key, title, summary, done_when FROM issues"):
+            out += [(f"finding {key}", t) for t in cols if t]
+        for key, *cols in conn.execute("SELECT i.key, a.name, a.detail, a.why FROM issue_actions a "
+                                       "JOIN issues i ON i.id = a.issue_id"):
+            out += [(f"finding {key} (action)", t) for t in cols if t]
+    except sqlite3.OperationalError:          # a database from before findings existed
+        pass
     return out
 
 

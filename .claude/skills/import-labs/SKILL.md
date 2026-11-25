@@ -46,9 +46,18 @@ python3 init_db.py --backup      # labs.db is the only copy of the user's data
    `python3 screening_calendar.py --set "<row name>" YYYY-MM-DD "<finding>"`.
 
 ## 3. The cascade (always, in this order)
-1. `python3 viewer.py && python3 check_all.py` — the import is not done while the gate is red.
-   Its stale-insight report lists the categories whose narrative now lags the new labs.
+1. `python3 issues.py` — re-read each finding whose markers moved (`--show KEY`). Rescore or
+   close it when the data settles it (`--set KEY status=resolved --why "two comparable draws on
+   target"`); ask the user when it is a judgement call. A new abnormality no finding covers
+   becomes a proposed finding: JSON under `inputs/`, loaded with `--load`. An imaging
+   measurement that tracks a finding gets attached: `--marker KEY BIOMARKER_ID --low … --high …`.
+2. If a finding's prescription changes, write it with `issues.py --action / --drop-action
+   … --why`, and give a new take / conditional its dose in the routine (the
+   `regenerate-unified-protocol` skill) in the same change.
+3. `python3 viewer.py && python3 check_all.py` — the import is not done while the gate is red.
+   Its stale-insight report lists the category narratives that now lag the new labs.
 
 ## 4. Report to the user
 - Rows inserted: count, laboratory, draw date. Each SUSPECT and how it was settled.
+- Findings that changed state or score, and why. Prescriptions that changed.
 - Calendar rows that closed.

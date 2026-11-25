@@ -737,36 +737,24 @@
   {
    "category_id": 4,
    "insight": "(Example insight — synthetic demo data. Replace with your own via CLAUDE.md.)\n\nLipids are trending favorably over three draws: LDL 3.4 → 2.9 mmol/L, triglycerides 1.4 → 1.1, HDL nudging up to 1.4. Total cholesterol 4.9 mmol/L. The residual lever is ApoB (see Cardiovascular Risk) — the particle-count marker that tracks atherogenic risk better than LDL-C alone.",
-   "supplements": "• Omega-3 (EPA/DHA) 1–2 g/day — lowers triglycerides.\n• Consider dietary fiber (psyllium 5–10 g/day) — modest LDL reduction.",
-   "diet": "Mediterranean pattern: olive oil, oily fish 2×/week, legumes, nuts. Limit refined carbs and saturated fat; both move triglycerides and LDL.",
-   "activity": "150 min/week Zone-2 cardio + 2 resistance sessions raises HDL and improves particle size.",
-   "lifestyle": "Alcohol moderation directly lowers triglycerides.",
-   "checkup_schedule": "Recheck full lipid panel + ApoB every 6–12 months while intervening.",
    "concordance": null
   },
   {
    "category_id": 5,
    "insight": "(Example insight — synthetic demo data. Replace with your own via CLAUDE.md.)\n\nApoB 0.82 g/L is just above the 0.80 optimal ceiling but falling (0.95 → 0.82). hs-CRP has normalized to 0.9 mg/L (below the 1.0 optimal line). Lp(a) 45 nmol/L is moderate and genetically fixed — it raises baseline risk independent of LDL.",
    "insight_dna": "APOE ε3/ε4 carries one ε4 allele: expect higher LDL/ApoB and a stronger response to saturated-fat reduction. NOS3 and 9p21 status (if present in your DNA import) further shape endothelial and coronary risk. This is a lean, not a diagnosis.",
-   "supplements": "• Continue omega-3.\n• If ApoB stays >0.8 despite diet, discuss a statin with your clinician (SLCO1B1 genotype informs statin choice — see Drug Metabolism).",
-   "diet": "Prioritize saturated-fat reduction — ε4 carriers are especially diet-responsive.",
-   "activity": "Regular aerobic exercise improves endothelial (NO-mediated) function.",
-   "lifestyle": "No smoking; manage blood pressure — both compound genetic CV risk.",
-   "checkup_schedule": "ApoB + hs-CRP every 6 months; one-time Lp(a) is sufficient (it's stable for life). Consider a coronary artery calcium (CAC) scan for risk restratification.",
    "concordance": "APOE ε4 → higher ApoB|elevated ApoB|ApoB 0.82 g/L, trending down|PARTIAL\nLp(a) genetic elevation → added CV risk|higher baseline risk|Lp(a) 45 nmol/L (moderate)|CONFIRMS\nInflammatory risk|elevated hs-CRP|hs-CRP normalized to 0.9 mg/L|FAVORABLE"
   },
   {
    "category_id": 15,
    "insight": "(Example insight — synthetic demo data. Replace with your own via CLAUDE.md.)\n\nPharmacogenomic genotypes flag how you metabolize common drugs. Review these with any prescriber before starting a new medication — they change drug choice and dose, not just risk.",
    "insight_dna": "CYP2C19 *1/*2 (intermediate) — reduced clopidogrel activation; consider an alternative antiplatelet if indicated. SLCO1B1 normal (*1/*1) — standard statin tolerance expected. Always confirm with clinical PGx testing before acting.",
-   "checkup_schedule": "No routine labs — this is a fixed genetic reference. Revisit when a new prescription is considered.",
    "concordance": null
   },
   {
    "category_id": 1,
    "insight": "(Example insight — synthetic demo data. Replace with your own via CLAUDE.md.)\n\nMetabolic and inflammatory markers are in good shape (HbA1c 5.2%, hs-CRP 0.9, fasting insulin 8 µU/mL), which are the biomarkers that most move biological age. Vitamin D has climbed into the optimal band (85 nmol/L) and homocysteine is approaching its 8 µmol/L target.",
    "insight_dna": "APOE ε3/ε4 (one ε4 allele) and FOXO3 rs2802292 G/T (one longevity allele) are the two headline longevity variants here. ε4 modestly raises Alzheimer's/CV risk; the FOXO3 G allele is centenarian-associated. Common-variant longevity effects are individually small — read as a lean, not a verdict.",
-   "checkup_schedule": "Annual metabolic + inflammatory panel; these drive most of the modifiable aging signal.",
    "concordance": null
   }
  ],
@@ -836,5 +824,111 @@
    "relevance": "H63D carrier — mild iron-loading potential; watch ferritin/transferrin saturation"
   }
  ],
- "unified_protocol": "═══ EXAMPLE MASTER PROTOCOL ═══\n\nThis is synthetic demo content. Your Claude regenerates it from your own labs,\nvariants, and stack — see CLAUDE.md (\"Synthesizing the master protocol\").\n\n═══ A. SUPPLEMENTS ═══\n\n─── Tier 1 (evidence-backed, targeted) ───\n• Omega-3 (EPA/DHA) 1–2 g/day — triglycerides 1.1 mmol/L, cardiovascular support.\n• Vitamin D3 2000 IU/day — 25-OH-D 85 nmol/L (in optimal band); maintain, don't exceed.\n\n─── Tier 2 (supportive) ───\n• Magnesium glycinate 200–400 mg/day — sleep, glucose handling.\n• Methylfolate + B12 — MTHFR C677T heterozygous; keeps homocysteine ≤8 µmol/L.\n\n═══ B. DIET ═══\nMediterranean pattern; saturated-fat reduction prioritized (APOE ε4). Lactose-free\ndairy or lactase enzyme (MCM6 non-persistent).\n\n═══ C. ACTIVITY ═══\n150 min/week Zone-2 cardio + 2 resistance sessions.\n\n═══ D. LIFESTYLE ═══\n7–9 h sleep; no smoking; alcohol moderation (also lowers triglycerides).\n\n═══ E. MONITORING ═══\nApoB + hs-CRP every 6 months; full lipids + metabolic panel annually; one-time Lp(a).\n\n═══ H. PHARMACOGENOMICS ═══\nCYP2C19 intermediate — flag before clopidogrel. SLCO1B1 normal — statins standard.\n"
+ "unified_protocol": "DAILY ROUTINE — synthetic demo. Your agent writes this from your findings (see CLAUDE.md).\nDoses live here and nowhere else; each finding says what to take and why. No lab values here:\nresults live in test_results, targets in the findings.\n\n════════════════════════════════════════════\n1. SCHEDULE\n════════════════════════════════════════════\n─── Breakfast ───\n• Psyllium husk — 5 g stirred into water, before breakfast\n• Vitamin D3 (general) — 1000 IU, with food\n─── Dinner ───\n• Omega-3 (EPA/DHA) (general) — 1 g, with dinner\n\n\n════════════════════════════════════════════\n2. DIET\n════════════════════════════════════════════\n• Mediterranean pattern: olive oil, oily fish twice a week, legumes, nuts, vegetables at every meal.\n• Alcohol: a few drinks a week at most.\n\n\n════════════════════════════════════════════\n3. ACTIVITY\n════════════════════════════════════════════\n• Two resistance sessions a week; walk daily.\n\n\n════════════════════════════════════════════\n4. LIFESTYLE\n════════════════════════════════════════════\n• No smoking. A fixed wake time; screens off an hour before bed.\n\n\n════════════════════════════════════════════\n5. MEDICINES & GENES\n════════════════════════════════════════════\n• CYP2C19 intermediate metabolizer (*1/*2): reduced activation of clopidogrel — tell any prescriber.\n• SLCO1B1 normal function: standard statin dosing.\n• APOE ε3/ε4: one ε4 allele — relevant to lipid targets and to dementia-risk discussions.\n\n",
+ "issues": [
+  {
+   "key": "ldl-above-target",
+   "category": "Lipid Panel",
+   "title": "LDL cholesterol above its target",
+   "opened_at": "2024-03-15",
+   "summary": "Synthetic demo finding. LDL is above the tighter target an APOE ε4 allele argues for, and falling on diet and fibre.",
+   "severity": 45,
+   "confidence": 70,
+   "status": "open",
+   "done_when": "Two comparable draws at or under target.",
+   "why": "Demo: three draws above the target; one ε4 allele.",
+   "markers": [
+    {
+     "id": 8,
+     "name": "LDL Cholesterol",
+     "high": 2.6
+    },
+    {
+     "id": 11,
+     "name": "Apolipoprotein B",
+     "note": "context: particle count behind LDL"
+    }
+   ],
+   "screenings": [
+    "Lipid panel"
+   ],
+   "actions": [
+    {
+     "kind": "take",
+     "name": "Psyllium husk",
+     "marker": 8,
+     "why": "Soluble fibre lowers LDL modestly and safely."
+    },
+    {
+     "kind": "diet",
+     "name": "Saturated fat down",
+     "detail": "swap butter and fatty meat for olive oil and fish",
+     "why": "The largest dietary lever on LDL, and ε4 carriers respond strongly."
+    },
+    {
+     "kind": "activity",
+     "name": "Zone-2 cardio",
+     "detail": "150 minutes a week",
+     "why": "Improves the lipid profile and cardiovascular fitness."
+    },
+    {
+     "kind": "refer",
+     "name": "Discuss a statin",
+     "detail": "if LDL is still above target after six months",
+     "why": "Lifestyle first; a statin if the target is not reached."
+    }
+   ]
+  },
+  {
+   "key": "hs-crp-low-grade",
+   "category": "Inflammation & Immunity",
+   "title": "Low-grade inflammation (hs-CRP)",
+   "opened_at": "2024-03-15",
+   "summary": "Synthetic demo finding. hs-CRP was above the cardiovascular-risk cut-off and has come down; keep watching.",
+   "severity": 20,
+   "confidence": 60,
+   "status": "watch",
+   "done_when": "Two comparable draws under the cut-off.",
+   "why": "Demo: above the cut-off on the first two draws.",
+   "markers": [
+    {
+     "id": 24,
+     "name": "hs-CRP",
+     "high": 1.0
+    }
+   ],
+   "actions": [
+    {
+     "kind": "lifestyle",
+     "name": "Sleep 7–9 hours",
+     "why": "Short sleep raises inflammatory markers."
+    }
+   ]
+  },
+  {
+   "key": "cyp2c19-clopidogrel",
+   "category": "Drug Metabolism (Pharmacogenomics)",
+   "title": "Reduced clopidogrel activation (CYP2C19 *2)",
+   "opened_at": "2024-03-15",
+   "summary": "Synthetic demo finding. One CYP2C19 loss-of-function allele: clopidogrel is activated less well. Judged by the genotype, not a lab value.",
+   "severity": 30,
+   "confidence": 80,
+   "status": "watch",
+   "done_when": "Recorded on every prescriber's file.",
+   "why": "Demo: genotype CYP2C19 *1/*2.",
+   "actions": [
+    {
+     "kind": "avoid",
+     "name": "Clopidogrel",
+     "detail": "unless genotype-guided",
+     "why": "Intermediate metabolizers get less antiplatelet effect."
+    },
+    {
+     "kind": "refer",
+     "name": "Tell prescribers about CYP2C19 *1/*2",
+     "why": "So an alternative antiplatelet is chosen if one is ever needed."
+    }
+   ]
+  }
+ ]
 }

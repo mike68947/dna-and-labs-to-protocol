@@ -39,17 +39,67 @@ CREATE TABLE test_results (
     UNIQUE(biomarker_id, date)         -- one value per marker per date; import with INSERT OR IGNORE
 );
 
--- ── Claude-authored layer ────────────────────────────────────────────────────
-CREATE TABLE category_insights (
+-- ── Findings: the unit of the protocol (written only through issues.py) ──────
+-- One row is ONE finding with one exit criterion. What is stored is the judgement and its
+-- history; whether a marker is on target and which way it moved is computed on every read.
+CREATE TABLE issues (
+    id          INTEGER PRIMARY KEY,
+    key         TEXT NOT NULL UNIQUE,     -- short slug, e.g. 'ldl-above-target'
+    category_id INTEGER NOT NULL REFERENCES categories(id),   -- groups findings in the viewer
+    title       TEXT NOT NULL,
+    summary     TEXT NOT NULL,            -- plain language; never a value (values live in test_results)
+    severity    INTEGER NOT NULL CHECK (severity BETWEEN 0 AND 100),
+    confidence  INTEGER CHECK (confidence BETWEEN 0 AND 100),
+    status      TEXT NOT NULL CHECK (status IN ('open','watch','resolved','retired')),
+    done_when   TEXT,                     -- the exit criterion
+    opened_at   TEXT NOT NULL,
+    closed_at   TEXT                      -- set exactly when resolved / retired
+);
+
+CREATE TABLE issue_markers (              -- what measures a finding, and what "good" means
+    issue_id     INTEGER NOT NULL REFERENCES issues(id),
+    biomarker_id INTEGER NOT NULL REFERENCES biomarkers(id),
+    target_low   REAL,                    -- both NULL = a context marker with no target
+    target_high  REAL,
+    note         TEXT,
+    PRIMARY KEY (issue_id, biomarker_id),
+    CHECK (target_low IS NULL OR target_high IS NULL OR target_low <= target_high)
+);
+
+CREATE TABLE issue_events (               -- why a score, status, target or action changed
+    id         INTEGER PRIMARY KEY,
+    issue_id   INTEGER NOT NULL REFERENCES issues(id),
+    date       TEXT NOT NULL,
+    kind       TEXT NOT NULL,
+    severity   INTEGER,
+    confidence INTEGER,
+    why        TEXT NOT NULL CHECK (length(trim(why)) > 0)
+);
+
+CREATE TABLE issue_actions (              -- the prescription for a finding (no dose: the routine holds it)
+    id           INTEGER PRIMARY KEY,
+    issue_id     INTEGER NOT NULL REFERENCES issues(id),
+    kind         TEXT NOT NULL CHECK (kind IN ('take','conditional','avoid','diet','activity','lifestyle','refer')),
+    name         TEXT NOT NULL,
+    biomarker_id INTEGER REFERENCES biomarkers(id),   -- optional: the marker this item is aimed at
+    detail       TEXT,
+    why          TEXT NOT NULL CHECK (length(trim(why)) > 0)
+);
+CREATE UNIQUE INDEX idx_issue_actions ON issue_actions (issue_id, kind, name, COALESCE(biomarker_id, 0));
+
+CREATE TABLE biological_variation (       -- noise floor per analyte (rcv.py --set; never guessed)
+    biomarker_id INTEGER PRIMARY KEY REFERENCES biomarkers(id),
+    cvi          REAL NOT NULL CHECK (cvi > 0),   -- within-subject biological variation, %
+    source       TEXT NOT NULL,                   -- where the number comes from
+    recorded_at  TEXT NOT NULL
+);
+
+-- ── Claude-authored background ───────────────────────────────────────────────
+CREATE TABLE category_insights (      -- the assessment of a category; the prescription lives in findings
     id                INTEGER PRIMARY KEY,
     category_id       INTEGER NOT NULL UNIQUE REFERENCES categories(id),
     insight           TEXT NOT NULL,   -- lab-based narrative assessment
     insight_dna       TEXT,            -- DNA-enriched detail (optional)
-    supplements       TEXT,            -- the 5 structured protocol domains (viewer composes them into a Protocol tab)
-    diet              TEXT,
-    activity          TEXT,
-    lifestyle         TEXT,
-    checkup_schedule  TEXT,
     concordance       TEXT,            -- pipe rows: mechanism|predicted|observed|verdict
                                        -- verdict ∈ CONFIRMS/PARTIAL/UNRESOLVED/CONTRADICTS/FAVORABLE
     updated_at        DATE NOT NULL DEFAULT (date('now'))
@@ -70,7 +120,7 @@ CREATE TABLE variants (               -- populated by import_dna.py from your DN
     UNIQUE(category_id, rsid)
 );
 
-CREATE TABLE unified_protocol (
+CREATE TABLE unified_protocol (       -- the daily routine: five ═══ sections, doses in 1. SCHEDULE only
     id          INTEGER PRIMARY KEY,
     protocol    TEXT NOT NULL,
     updated_at  TEXT DEFAULT (datetime('now'))
@@ -85,7 +135,8 @@ CREATE TABLE screenings (             -- forward "what's due" calendar (seeded b
     last_result TEXT,
     rationale TEXT,
     priority TEXT,
-    updated_at TEXT
+    updated_at TEXT,
+    issue_id INTEGER REFERENCES issues(id)   -- the finding this row belongs to (set by issues.py)
 );
 
 CREATE TABLE documents (              -- imaging / report text Claude ingests (LLM context; not viewer-rendered)
