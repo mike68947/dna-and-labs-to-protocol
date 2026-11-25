@@ -1,175 +1,126 @@
 # CLAUDE.md
 
-Guidance for Claude Code working in this repo.
+The agent manual for this repo (other agents read it through `AGENTS.md`). Each rule is one line,
+with its reason in a few words.
 
-## What this is
+A personal health-data tracker. The user brings lab results (any format), imaging and consult
+reports, and DNA (a VCF or a 23andMe / AncestryDNA raw file). You import them into `labs.db`
+(SQLite), keep a short list of **findings** — what is wrong, what "good" means, what is
+prescribed, and whether it is working — plus a **daily routine** that holds the doses, and
+`viewer.py` renders it all into one self-contained `viewer.html`.
 
-A personal health-data tracker. You bring lab results (any text format), imaging/report
-text, and DNA (a VCF or a 23andMe/AncestryDNA raw file); Claude imports them into a local
-SQLite database (`labs.db`), and `viewer.py` renders a single self-contained `viewer.html`
-with charts, genetic variants, per-category insights, and a master protocol.
+## When the user wants X, start at Y
 
-**`labs.db` is the source of truth, and once it holds your data nothing can rebuild it** — it is
-git-ignored, and `init_db.py` only creates the demo or an empty database. Back it up before every
-session that writes to it: `python3 init_db.py --backup` (gzipped into `backups/`, newest 14 kept;
-restore with `gunzip -c backups/labs-<stamp>.db.gz > labs.db`). All
-edits happen against `labs.db` directly (or against `data/seed.json` if you want them in
-the seeded example). Python standard library only, plus optional `bcftools` for fast VCF
-queries (pure-Python fallback); Chart.js is vendored (`vendor/chart.umd.min.js`, pinned 4.5.1)
-and inlined into the generated HTML — the viewer makes no network requests.
+| The user wants… | Start at |
+|---|---|
+| to start with their own data | `python3 init_db.py --empty`, then copy `data/user_facts.example.md` to `inputs/user_facts.md` and fill it in |
+| to add a lab report (PDF, photo, table) or an imaging / consult / procedure report | the `import-labs` skill |
+| to import their DNA | `python3 import_dna.py inputs/<file>` (`--build 37\|38` if the VCF header is ambiguous) |
+| to look up any variant, catalogued or not | `python3 lookup_variant.py rs… rs…` (`--offline`: no Ensembl) |
+| to see the findings and whether each is moving toward its target | `python3 issues.py` (`--show KEY` for one) |
+| to add findings | write them as JSON under `inputs/` (shape below) → `python3 issues.py --load inputs/<file>.json` |
+| to rescore, close or retarget a finding | `issues.py --set KEY field=value --why "…"` · `--marker KEY BIOMARKER_ID --low … --high … --why "…"` |
+| to change what is prescribed for a finding | `issues.py --action KEY KIND NAME [--on BIOMARKER_ID] [--detail …] --why "…"` · `--drop-action KEY KIND NAME --why "…"` |
+| to write or change the daily routine (a dose, a general rule, the medicines-and-genes sheet) | the `regenerate-unified-protocol` skill |
+| to refresh a category's narrative | the `regenerate-category` skill |
+| to give a marker a noise floor | `python3 rcv.py --set BIOMARKER_ID CVI --source "…"` |
+| to know what to test next, or what is overdue | `python3 screening_calendar.py --plan` |
+| to record a screening that was done | `python3 screening_calendar.py --set "<name>" YYYY-MM-DD "<finding>"` |
+| to change a cadence or add a screening item | edit `SEED` in `screening_calendar.py` → `python3 screening_calendar.py --init` |
+| to know whether anything disagrees | `python3 check_all.py` |
+| to look at it all | `python3 viewer.py && open viewer.html` |
+| to feed it to another LLM | `python3 export_for_llm.py` (`--summary` for the short form) and `master_protocol.md` |
+| to back up, or undo damage | `python3 init_db.py --backup` · restore: `gunzip -c backups/labs-<stamp>.db.gz > labs.db` |
+
+**A first build for a new user:** `init_db.py --empty` → import the labs (skill) and the DNA →
+propose findings from what is off (show them to the user before loading) → write the routine →
+optionally a narrative per category → `viewer.py` → `check_all.py`.
+
+## Rules
+
+### Every change
+- `labs.db` is the only copy of the user's data: nothing rebuilds it and git ignores it — `python3 init_db.py --backup` before any session that writes to it.
+- After any DB change: `python3 viewer.py`, then `python3 check_all.py`.
+- `check_all.py` gates (exit 1) only when two layers disagree about the same fact; a work queue is a report and never gates — a gate that cries wolf gets ignored.
+- When you add a rule, add the check that enforces it; prose alone drifts.
+- One fact, one place: a value lives in `test_results`, a target in `issue_markers`, a dose in the routine's SCHEDULE, a cadence in `screenings`. Nothing quotes another layer's fact.
+- Python standard library only (plus optional `bcftools`). Chart.js stays vendored at `vendor/chart.umd.min.js` (pinned 4.5.1) and inlined — never a CDN tag: the page holds the whole dataset.
+- A `labs.db` made by an older version gains new tables and columns on its own (`init_db.migrate`, run by the viewer, the import screen, `issues.py`).
+
+### Privacy
+- `labs.db`, `inputs/`, `imports/`, `backups/` and the generated files stay out of git (`.gitignore`); share only code and the synthetic seed.
+- Personal details (DOB, history, goals) go in `inputs/user_facts.md`, never in a tracked file.
+- A code fixture uses an invented analyte ("Testium") and invented findings — a real one will sooner or later equal someone's result.
+- The only network calls send a public rsID to Ensembl (`lookup_variant.py`, `enrich_variants.py`); `--offline` skips them.
+
+### Importing results
+- Every lab report or clinical document goes in through the `import-labs` skill.
+- Look a biomarker up by `(name_en, specimen_en, unit)` — the name alone is not unique (creatinine: blood and urine).
+- Insert only through `inspect_import.commit_import(conn, rows, lab=…, resolved={…})`, from a dated `imports/YYYY-MM-DD_<lab>.py`; acknowledge every `SUSPECT` with a reason, never insert one silently.
+- Check each value against its history, its sibling markers and the reference range even at a plausible magnitude: units change between labs, often for a whole class of analytes at once.
+- Every result names its laboratory (`test_results.lab`, "… (shipped sample)" when the tube travelled): a trend needs two draws from the same lab.
+- `test_results.value` is TEXT: keep qualifiers as written (`<10`, `>750`, `Negative`).
+- A symptom score or an imaging measurement is an ordinary biomarker (specimen `Self-report` / `Imaging`), so it gets a chart, a target and the import screen.
+
+### Findings (`issues.py`)
+- One finding is ONE problem with one exit criterion (`done_when`) — "LDL above target", not "Heart"; its category only groups it.
+- Write findings only through `issues.py` (`--load`, `--set`, `--marker`, `--action`, `--drop-action`, each with `--why`); a hand `UPDATE` is caught by `--check`, because the reason would be missing.
+- Severity (harm if unmanaged) and confidence (how firmly the user's own data establish it) are kept apart: an unconfirmed result lowers confidence, not severity. Scales in `issues.py`.
+- No lab value in a finding's text or an action (gate) — the viewer shows the values next to it, always current.
+- An action names no dose (the routine holds doses): `take` / `conditional` (trigger in `detail`) / `avoid` an item, or a `diet` / `activity` / `lifestyle` / `refer` rule.
+- Prescribe from clinical logic and the user's results and variants, not from what they happen to take today.
+- A direction needs two comparable draws (latest not stale, ≤400 days apart, same lab); otherwise the marker reads "off target" with the reason.
+- A move inside the analyte's noise floor is "flat" — but only where a CV_I is on file with its source (`rcv.py`; e.g. one lookup on biologicalvariation.eu, whose API is closed to outside use). Never invent one.
+- A withdrawn finding gets `status=retired` with the reason, not a delete.
+- Finding JSON (a list): `key, category (name or id), title, summary, severity, confidence, status, done_when, opened_at, why, markers [{id, name, low, high, note}], screenings [row names], actions [{kind, name, why, marker?, detail?}]`. `data/seed.json → issues` is a worked example.
+
+### The routine (`unified_protocol`)
+- Five `═══` sections in order — 1. SCHEDULE, 2. DIET, 3. ACTIVITY, 4. LIFESTYLE, 5. MEDICINES & GENES; a SCHEDULE bullet is `• Item — dose, timing`.
+- Every take / conditional of a live finding has a SCHEDULE bullet, no avoided item has one, every bullet is prescribed or tagged `(general)` (gate ACT1–3); it quotes no lab value (gate).
+- DIET / ACTIVITY / LIFESTYLE hold the general rules; a finding's own rules sit on the finding and the viewer shows them beside the section.
+
+### Genetic variants
+- Read direction from `variants.effect_allele` / `effect_copies` (0 / 1 / 2; NULL = unknown), never from the zygosity word.
+- `zygosity` is relative to the catalogue's risk genotype, not the reference genome; a reference genome often carries the minor or the effect allele, so a VCF's hom-ref / hom-alt says nothing about risk.
+- An effect allele comes only from a source (the entry's `risk` list, or `effect` + `source`, a PMID or GWAS Catalog study); otherwise it stays NULL.
+- Catalogue palindromic SNPs (A/T, C/G) are written on the genomic plus strand; on a minus-strand gene the paper's allele is the complement of the genome call.
+- A site absent from the file is not a genotype (not on the array, no call, filtered, or homozygous reference in a variant-only VCF); `lookup_variant.py` names the reference letters and says "if covered".
+- Prose may not write up a variant with 0 effect copies as carried (gate).
+- To surface an uncatalogued variant, promote it: `INSERT INTO variants (category_id, rsid, gene, relevance, genotype, zygosity, effect_allele, effect_copies)` with the same conventions; `check_all.py` re-reads every promoted row from the genome file. To make it reusable, add it to `data/known_variants.json` (see its `_README`) and run `python3 enrich_variants.py`.
+
+### Screening calendar
+- `screenings` is the only source of cadence and due dates; record a done screening with `--set`, never in code.
+- Name a new row so `KINDS` recognises where it is done; `--plan` and the viewer's `screeningPlan` mirror each other — change both.
+- A row more than a year late: do it, or change its cadence.
 
 ## Commands
 
 ```bash
-python3 init_db.py                 # create labs.db with a synthetic demo (--force to overwrite)
-python3 init_db.py --empty         # clean start for the user's OWN data: schema + categories, no demo rows
-python3 viewer.py                  # regenerate viewer.html + master_protocol.md  (run after ANY db change)
-python3 import_dna.py <file>       # match a VCF or 23andMe raw file → variants table
-python3 export_for_llm.py          # full lab time-series → labs_export.md (feed to an LLM)
-python3 export_for_llm.py --summary  # condensed per-biomarker summary → labs_summary.md
-python3 screening_calendar.py      # what preventive screening is due next (lab-backed rows self-update from test_results)
-python3 check_all.py               # every --self-check + CONSISTENCY gate + stale/freshness reports (run after viewer.py)
-open viewer.html
+python3 init_db.py                 # create labs.db with a synthetic demo (--force overwrites, after a backup)
+python3 init_db.py --empty         # clean start for the user's own data
+python3 init_db.py --backup        # gzipped snapshot into backups/ (newest 14 kept)
+python3 viewer.py                  # regenerate viewer.html + master_protocol.md (after ANY db change)
+python3 check_all.py               # every self-check, the CONSISTENCY gates, the reports
+python3 issues.py                  # findings and their state (--show, --load, --set, --marker, --action, --check)
+python3 screening_calendar.py --plan
+python3 import_dna.py <file>       # VCF or 23andMe / AncestryDNA raw → variants
+python3 lookup_variant.py rs…      # any variant from the genome file, on demand
+python3 rcv.py                     # noise floors on file (--set BIOMARKER_ID CVI --source "…")
+python3 export_for_llm.py          # lab time-series → labs_export.md (--summary → labs_summary.md)
 ```
 
-Every script has a `--self-check` (no writes); `python3 check_all.py` runs them all, then the
-**CONSISTENCY** gate (foreign-key orphans, future-dated results — exit 1) and the **REPORTS**
-(insights older than their labs, generated files older than `labs.db` — informational, never
-gate). Keep that split when adding a check: a gate that cries wolf gets ignored.
+## What `check_all.py` runs
 
-**Typical flow for the user's own data:** `python3 init_db.py --empty` → they drop their lab,
-DNA, and imaging files in `inputs/` → import the labs (below), `python3 import_dna.py` their
-genome, transcribe the imaging into `documents` → author `category_insights` + the master
-protocol → `python3 viewer.py` → `python3 check_all.py`.
+- **CONSISTENCY (gates)** — every script's `--self-check`; db invariants (no foreign-key orphan, no future-dated result); `issues.py --check` (every score, status and action has its event; no lab value in a finding; nothing both taken and avoided); the routine vs the findings (ROUTINE, ACT1–3, VALUES); `check_variants.py` (no 0-copy variant written up as carried; promoted rows match the genome file).
+- **REPORTS (never gate)** — the findings report (off target with nothing prescribed, markers with no noise floor), category narratives older than their labs, generated files older than `labs.db`, no backup within 3 days of the last change.
 
-## Data model (`labs.db`)
+## Data model (`labs.db`, full schema in `schema.sql`)
 
-`categories` · `biomarkers` (name, specimen, unit, ref_low/high, opt_low/high) ·
-`biomarker_categories` (junction) · `test_results` (biomarker_id, date, **value is TEXT** —
-preserves `<10`, `Negative`) · `category_insights` (the Claude-authored layer) · `variants`
-(from your DNA) · `unified_protocol` (one master blob) · `screenings` · `documents`
-(imaging/report text — LLM context, not viewer-rendered). Full schema in `schema.sql`.
-
-Categories are a deliberately small set of 16 (edit `schema.sql` to change them).
-Biomarker lookup key is `(name_en, specimen_en, unit)` — name alone isn't unique
-(e.g. Creatinine exists for blood and urine).
-
-## Importing labs and clinical documents
-
-Use the `import-labs` skill (`.claude/skills/import-labs/SKILL.md`): back up, read the report
-(draw date, lab, specimen, units), insert only through
-`inspect_import.commit_import(conn, rows, lab=…, resolved={…})` from a dated
-`imports/YYYY-MM-DD_<lab>.py`, then `viewer.py` → `check_all.py`.
-
-## Importing DNA
-
-```bash
-python3 import_dna.py inputs/genome.txt          # 23andMe/AncestryDNA raw OR .vcf; auto-detected
-python3 import_dna.py inputs/genome.vcf --build 38   # force build if the VCF header is ambiguous
-```
-It matches the file against `data/known_variants.json` (a curated ~46-SNP catalogue spanning
-pharmacogenomics, longevity, nutrition, fitness, and cardiovascular/iron risk), tries both
-DNA strands (except palindromic A/T and C/G SNPs, which are taken as reported — a flip there is
-undetectable), handles APOE's two-SNP ε genotype, and writes interpreted rows into `variants`.
-**Read direction from `effect_allele` / `effect_copies`, never from the zygosity word.**
-`import_dna.py` fills them from the entry's `risk` list (its homozygote names the effect allele);
-with no `risk` list (or an `effect` + `source` pair) they stay NULL — direction unknown.
-`zygosity` is relative to that risk genotype, NOT to the reference genome: `het` / `hom-alt`
-(the flagged homozygote) / `hom-ref` (another listed homozygote) / `hom` (direction unknown) /
-`hemi` (one copy, e.g. a male X call). Non-PASS VCF calls are skipped, and a site absent from
-the file gets no row: absence is not a genotype.
-`example_genome.txt` is a synthetic file for testing.
-
-**VCF matching:** by rsID (the ID column) when present; when the ID column is blank (`.`, as in
-a raw whole-genome VCF), it falls back to matching by chromosome + position. Positions are
-build-specific, so the genome build (GRCh37/hg19 vs GRCh38/hg38) is auto-detected from the VCF
-header (`##contig` lengths or a `##reference`/assembly string) — override with `--build 37|38`.
-23andMe/AncestryDNA raw files are always GRCh37.
-
-**To cover more variants:** add entries to `data/known_variants.json` (see its `_README`):
-`rsID → {gene, category (a name_en from schema.sql), note, genotypes{gt: interpretation},
-risk[]}`. Then run `python3 enrich_variants.py` to backfill `chrom` + dual-build `pos` from
-Ensembl (needed only for the position fallback; rsID matching works without it). Keep
-interpretations honest — common-variant effects are small and often population-specific.
-Re-run `import_dna.py` + `viewer.py`.
-
-## DNA analysis phase (query any variant, not just the catalogue)
-
-The catalogue is the *interpreted highlights*, not the limit. **The genome file in `inputs/`
-is the source of truth for every genotype — keep it there** (it's git-ignored). `import_dna.py`
-only writes the curated matches to `variants`; the rest of the genome stays in the file,
-queryable on demand. To analyze a topic that needs SNPs beyond the catalogue:
-
-1. **Query** any rsID(s) straight from the file — no re-import, no DB bloat:
-   ```bash
-   python3 lookup_variant.py rs1801133 rs662 rs1229984   # genotype + interpretation if catalogued
-   ```
-   It reads the VCF with bcftools when available (fast random access on a bgzipped, tabix-indexed
-   file) or a pure-Python scan otherwise, and auto-detects the build. For an un-annotated VCF it
-   resolves any requested rsID's position from Ensembl on demand — so you're not limited to
-   catalogued rsIDs (`--offline` skips the network and uses catalogue coordinates only). A
-   resolved position with no record in the VCF is reported as homozygous reference. Read-only —
-   it never writes the DB.
-2. **Interpret** the genotypes (your own knowledge, or fetch context from Ensembl/ClinVar).
-3. **Promote** anything worth surfacing into the viewer — insert an interpreted row:
-   ```sql
-   INSERT INTO variants (category_id, rsid, gene, relevance, genotype, zygosity,
-                         effect_allele, effect_copies)
-   VALUES (:cid, :rsid, :gene, :interpretation, :genotype, :zygosity, :allele, :copies);
-   ```
-   Same conventions as the catalogue: `zygosity` relative to the risk genotype, and
-   `effect_allele` / `effect_copies` only from a source that names the allele (GWAS Catalog,
-   a PubMed abstract) — otherwise NULL. A reference genome often carries the minor or the
-   effect allele, so "hom-ref"/"hom-alt" from a VCF says nothing about risk; and on a
-   minus-strand gene the paper's allele is the complement of the genome call.
-   `check_all.py` re-reads every promoted row from the genome file.
-   To make it a *reusable, auto-interpreted* highlight (so future imports label it), add the
-   SNP to `data/known_variants.json` and run `python3 enrich_variants.py`. Then `python3 viewer.py`.
-
-Out of scope (upgrade path): gene-region scanning and novel/rare-variant pathogenicity scoring
-(bcftools + snpEff + Ensembl VEP) — heavy and WGS-only; add it only if you need to discover
-variants that don't already have a known rsID.
-
-## Importing imaging / reports
-
-Transcribe the finding into `documents` (`title, doc_date, doc_type, category_id, body`,
-optional `file_path`). Then fold the clinically relevant conclusion into the matching
-`category_insights.insight` so it surfaces in the viewer. `documents` itself is LLM context,
-not a viewer panel.
-
-## Authoring category_insights
-
-One row per category. Write into these columns (the viewer composes a Protocol tab from the
-five structured domains, and an Assessment tab from the rest):
-- `insight` — lab-based narrative (**required**, NOT NULL).
-- `insight_dna` — what the person's variants add (optional).
-- `supplements` / `diet` / `activity` / `lifestyle` / `checkup_schedule` — the protocol.
-- `concordance` — for genomically-loaded categories: one row per line,
-  `mechanism|predicted|observed|verdict`, verdict ∈ `CONFIRMS`/`PARTIAL`/`UNRESOLVED`/
-  `CONTRADICTS`/`FAVORABLE` (bare keyword only). Rendered as a "do the labs confirm the
-  genetic prediction?" table.
-
-Ground every claim in the person's actual values and variants. Use `date('now')` for
-`updated_at`. The seeded rows (categories 1, 4, 5, 15) are worked examples — follow their
-shape, replace their content.
-
-## Synthesizing the master protocol
-
-`unified_protocol` is one hand-curated blob consolidating the active per-category protocols
-into a single document (supplements by tier, diet, activity, lifestyle, monitoring,
-pharmacogenomic notes). It is NOT auto-composed — when you change a per-category protocol,
-reconcile the unified blob too (grep it for the supplement/rule/number that changed).
-Use `═══ SECTION ═══` and `─── sub ───` separators (the viewer styles them). Only include
-items actually in use.
-
-## Conventions
-
-- After ANY db change, run `python3 viewer.py`, then `python3 check_all.py`.
-- `test_results.value` is TEXT, not numeric.
-- Python standard library only, plus optional `bcftools` for fast VCF querying (auto-detected;
-  a pure-Python scan runs when it's absent). Chart.js is vendored at `vendor/chart.umd.min.js`
-  (pinned 4.5.1, MIT) and inlined — the viewer makes no network requests. Don't reintroduce a CDN
-  tag (the page holds the whole dataset); to upgrade, re-download a pinned build into `vendor/`
-  and re-run `viewer.py`.
-- **Privacy:** this is personal medical data. Keep `labs.db`, `inputs/`, `imports/`, and generated
-  exports out of git (see `.gitignore`); share only the code and the synthetic seed.
+`categories` (16) · `biomarkers` (name, specimen, unit, ref_low/high, opt_low/high) ·
+`biomarker_categories` · `test_results` (biomarker_id, date, **value TEXT**, lab; one per marker per
+date) · `issues` / `issue_markers` / `issue_actions` / `issue_events` (the findings) ·
+`biological_variation` (CV_I per marker, with source) · `unified_protocol` (the routine) ·
+`category_insights` (background narrative per category: insight, insight_dna, concordance
+`mechanism|predicted|observed|verdict`) · `variants` (genotype, zygosity, effect_allele,
+effect_copies) · `screenings` (cadence, last done, `issue_id`) · `documents` (imaging / report
+text, LLM context).
